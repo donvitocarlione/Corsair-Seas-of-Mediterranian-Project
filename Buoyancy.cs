@@ -3,31 +3,31 @@ using UnityEngine;
 public class Buoyancy : MonoBehaviour
 {
     [Header("Buoyancy Settings")]
-    public float waterDensity = 1000f;
+    public float waterDensity = 1000f;  // Standard water density in kg/m³
     [SerializeField] private float waterLevelY = 0f;
-    public float buoyancyForce = 15f;
+    public float buoyancyForce = 1000f;  // Starting with ship mass as base force
     public float waterDrag = 2f;
     public float waterAngularDrag = 2f;
     
     [Header("Wave Settings")]
     public bool useWaves = true;
-    public float waveHeight = 0.5f;
+    public float waveHeight = 1f;  // Increased for better visibility
     public float waveFrequency = 1f;
     public float waveSpeed = 1f;
     public Vector2 waveDirection = new Vector2(1f, 1f);
-    public float secondaryWaveRatio = 0.8f; // How strong the secondary wave is compared to primary
+    public float secondaryWaveRatio = 0.8f;
     
     [Header("Advanced Settings")]
-    public float sideResistance = 3f;  // Resistance to sideways movement
-    public float turningResistance = 2f;  // Resistance to rotation
-    public int buoyancyPoints = 4; // Number of points to apply buoyancy force
+    public float sideResistance = 5f;  // Increased side resistance
+    public float turningResistance = 3f;  // Increased turning resistance
+    public int buoyancyPoints = 8;  // Increased number of points for better stability
     
     [Header("Stabilization")]
-    public float rollStability = 0.3f;  // How strongly the ship tries to stay upright
-    public float pitchStability = 0.2f;  // How strongly the ship resists pitch changes
+    public float rollStability = 0.5f;  // Increased roll stability
+    public float pitchStability = 0.3f;  // Increased pitch stability
     
     [Header("Shader Sync Settings")]
-    public Material waterMaterial; // Reference to your water shader material
+    public Material waterMaterial;
     private readonly int WaveHeightProperty = Shader.PropertyToID("Vector1_7273530c27a34c9f8ee5723b84f96baa");
     private readonly int WaveFrequencyProperty = Shader.PropertyToID("Vector1_6c82dffdd68049bcb019d3a9c64c92a0");
     private readonly int WaveSpeedProperty = Shader.PropertyToID("Vector1_6269b1025b26473ca8bc61634f34b537");
@@ -37,6 +37,7 @@ public class Buoyancy : MonoBehaviour
     public float boatSubmergedPercentage = 0f;
     public bool isInWater;
     public Vector3 waterMovement;
+    public bool showDebugLogs = false;  // Toggle for debug logs
     
     private Rigidbody rb;
     private Collider boatCollider;
@@ -45,7 +46,6 @@ public class Buoyancy : MonoBehaviour
     private float timeOffset;
     private Vector3[] buoyancyPointsPositions;
 
-    // Public property to access water level
     public float WaterLevel => waterLevelY;
     
     void Start()
@@ -60,37 +60,44 @@ public class Buoyancy : MonoBehaviour
             return;
         }
         
-        // Store initial values
         initialDrag = rb.drag;
         initialAngularDrag = rb.angularDrag;
         
-        // Set recommended Rigidbody settings
-        rb.mass = 1000f; // 1 ton
+        // Set initial position slightly above water
+        if (transform.position.y <= waterLevelY)
+        {
+            transform.position = new Vector3(transform.position.x, waterLevelY + 0.1f, transform.position.z);
+        }
+        
+        rb.mass = 1000f;
         rb.useGravity = true;
         rb.constraints = RigidbodyConstraints.None;
         
-        // Random offset for wave variation
         timeOffset = Random.Range(0f, 100f);
         
-        // Initialize buoyancy points
         InitializeBuoyancyPoints();
         
-        // Sync with shader if material is assigned
         if (waterMaterial != null)
         {
             SyncWithShader();
         }
+
+        Debug.Log("Buoyancy System Initialized - Ship Mass: " + rb.mass + "kg, Water Density: " + waterDensity + "kg/m³");
     }
     
     void SyncWithShader()
     {
-        // Read values from shader and apply to buoyancy system
         if (waterMaterial != null)
         {
             waveHeight = waterMaterial.GetFloat(WaveHeightProperty);
             waveFrequency = waterMaterial.GetFloat(WaveFrequencyProperty);
             waveSpeed = waterMaterial.GetFloat(WaveSpeedProperty);
             waveDirection = waterMaterial.GetVector(WaveDirectionProperty);
+            
+            if (showDebugLogs)
+            {
+                Debug.Log($"Shader Sync - Wave Height: {waveHeight}, Frequency: {waveFrequency}, Speed: {waveSpeed}");
+            }
         }
     }
     
@@ -101,11 +108,11 @@ public class Buoyancy : MonoBehaviour
         float length = bounds.size.z;
         float width = bounds.size.x;
         
-        // Create points along the bottom of the ship
+        // Create more distributed points for better stability
         for (int i = 0; i < buoyancyPoints; i++)
         {
-            float xPos = (i % 2 == 0) ? -width/4 : width/4;
-            float zPos = (i < buoyancyPoints/2) ? -length/4 : length/4;
+            float xPos = (i % 2 == 0) ? -width/3 : width/3;
+            float zPos = (length/2) * ((float)i / buoyancyPoints - 0.5f);
             buoyancyPointsPositions[i] = new Vector3(xPos, -bounds.size.y/2, zPos);
         }
     }
@@ -114,8 +121,9 @@ public class Buoyancy : MonoBehaviour
     {
         UpdateWaterLevel();
         
-        // Apply buoyancy at each point
         float totalSubmerged = 0;
+        Vector3 totalBuoyancyForce = Vector3.zero;
+        
         foreach (Vector3 point in buoyancyPointsPositions)
         {
             Vector3 worldPoint = transform.TransformPoint(point);
@@ -126,20 +134,24 @@ public class Buoyancy : MonoBehaviour
                 float submersion = Mathf.Clamp01((waveHeight - worldPoint.y) / 1f);
                 totalSubmerged += submersion;
                 
-                // Calculate buoyancy force with wave movement
-                float displacementMultiplier = Mathf.Clamp01(1f - (worldPoint.y - (waveHeight - 1f)));
+                // Improved buoyancy calculation
+                float depthFactor = Mathf.Clamp01((waveHeight - worldPoint.y) / 2f);
+                float displacementMultiplier = depthFactor * (waterDensity / 1000f);
                 Vector3 buoyancyForceAtPoint = Vector3.up * buoyancyForce * displacementMultiplier;
                 
-                // Add horizontal force from waves
                 Vector3 waveForce = CalculateWaveForce(worldPoint);
                 buoyancyForceAtPoint += waveForce * displacementMultiplier;
                 
-                // Apply force
                 rb.AddForceAtPosition(buoyancyForceAtPoint, worldPoint, ForceMode.Force);
+                totalBuoyancyForce += buoyancyForceAtPoint;
+                
+                if (showDebugLogs)
+                {
+                    Debug.Log($"Point {worldPoint} - Submersion: {submersion:F2}, Force: {buoyancyForceAtPoint.magnitude:F2}N");
+                }
             }
         }
         
-        // Update submerged percentage
         boatSubmergedPercentage = totalSubmerged / buoyancyPoints;
         isInWater = boatSubmergedPercentage > 0;
         
@@ -147,6 +159,11 @@ public class Buoyancy : MonoBehaviour
         {
             ApplyWaterResistance();
             ApplyStabilizationForces();
+            
+            if (showDebugLogs)
+            {
+                Debug.Log($"Total Buoyancy Force: {totalBuoyancyForce.magnitude:F2}N, Submerged: {boatSubmergedPercentage:P0}");
+            }
         }
         else
         {
@@ -159,17 +176,13 @@ public class Buoyancy : MonoBehaviour
     {
         if (!useWaves) return Vector3.zero;
 
-        // Calculate wave gradients for X and Z directions
         float dx = waveDirection.x * waveFrequency;
         float dz = waveDirection.y * waveFrequency;
-        
         float time = Time.time * waveSpeed + timeOffset;
         
-        // Calculate wave slopes
         float slopeX = Mathf.Cos(worldPosition.x * dx + time) * waveHeight;
         float slopeZ = Mathf.Cos(worldPosition.z * dz + time) * waveHeight;
         
-        // Create a force based on the wave slopes
         return new Vector3(slopeX, 0, slopeZ) * waveSpeed;
     }
     
@@ -180,14 +193,10 @@ public class Buoyancy : MonoBehaviour
             
         float x = worldPosition.x * waveDirection.x;
         float z = worldPosition.z * waveDirection.y;
-        
         float time = Time.time * waveSpeed + timeOffset;
         
-        // Primary wave
         float wave1 = Mathf.Sin(x * waveFrequency + time);
         float wave2 = Mathf.Sin(z * waveFrequency * secondaryWaveRatio + time * secondaryWaveRatio);
-        
-        // Secondary wave
         float wave3 = Mathf.Sin((x + z) * waveFrequency * 0.5f + time * 1.2f);
         
         float waveSum = (wave1 + wave2 + wave3) / 3f;
@@ -196,38 +205,33 @@ public class Buoyancy : MonoBehaviour
     
     void ApplyWaterResistance()
     {
-        // Basic water resistance
         rb.drag = waterDrag * boatSubmergedPercentage;
         rb.angularDrag = waterAngularDrag * boatSubmergedPercentage;
         
-        // Calculate relative velocity
         Vector3 localVelocity = transform.InverseTransformDirection(rb.velocity);
         
-        // Apply directional resistance
+        // Improved directional resistance
         Vector3 sideForce = -transform.right * localVelocity.x * sideResistance * boatSubmergedPercentage;
-        rb.AddForce(sideForce, ForceMode.Force);
+        Vector3 forwardForce = -transform.forward * localVelocity.z * (sideResistance * 0.5f) * boatSubmergedPercentage;
+        rb.AddForce(sideForce + forwardForce, ForceMode.Force);
         
-        // Apply turning resistance
         Vector3 turnForce = -transform.up * rb.angularVelocity.y * turningResistance * boatSubmergedPercentage;
         rb.AddTorque(turnForce, ForceMode.Force);
     }
     
     void ApplyStabilizationForces()
     {
-        // Roll stabilization
         float currentRoll = Vector3.Dot(transform.right, Vector3.up);
         Vector3 rollCorrection = transform.forward * -currentRoll * rollStability * boatSubmergedPercentage;
-        rb.AddTorque(rollCorrection, ForceMode.Force);
         
-        // Pitch stabilization
         float currentPitch = Vector3.Dot(transform.forward, Vector3.up);
         Vector3 pitchCorrection = transform.right * -currentPitch * pitchStability * boatSubmergedPercentage;
-        rb.AddTorque(pitchCorrection, ForceMode.Force);
+        
+        rb.AddTorque(rollCorrection + pitchCorrection, ForceMode.Force);
     }
     
     void UpdateWaterLevel()
     {
-        // Update based on shader's wave height at the ship's position
         if (useWaves)
         {
             Vector3 centerPos = transform.position;
@@ -245,25 +249,32 @@ public class Buoyancy : MonoBehaviour
             Vector3 worldPoint = transform.TransformPoint(point);
             float waveHeight = CalculateWaveHeight(worldPoint);
             
-            // Draw buoyancy points
+            // Draw buoyancy points and their depth
             Gizmos.DrawLine(worldPoint, new Vector3(worldPoint.x, waveHeight, worldPoint.z));
             Gizmos.DrawWireSphere(worldPoint, 0.1f);
             
-            // Draw wave forces
-            if (useWaves)
+            // Show forces when point is submerged
+            if (worldPoint.y < waveHeight)
             {
-                Gizmos.color = Color.red;
-                Vector3 waveForce = CalculateWaveForce(worldPoint);
-                Gizmos.DrawRay(worldPoint, waveForce);
+                Gizmos.color = Color.green;
+                Gizmos.DrawRay(worldPoint, Vector3.up * buoyancyForce * 0.001f);
+                
+                if (useWaves)
+                {
+                    Gizmos.color = Color.red;
+                    Vector3 waveForce = CalculateWaveForce(worldPoint);
+                    Gizmos.DrawRay(worldPoint, waveForce);
+                }
+                
                 Gizmos.color = Color.blue;
             }
         }
         
-        // Draw water level at ship position
+        // Visualize water level
         Gizmos.color = new Color(0f, 0.7f, 1f, 0.3f);
         Vector3 shipPos = transform.position;
         float shipWaterLevel = CalculateWaveHeight(shipPos);
         Vector3 cubeCenter = new Vector3(shipPos.x, shipWaterLevel, shipPos.z);
-        Gizmos.DrawCube(cubeCenter, new Vector3(3f, 0.1f, 3f));
+        Gizmos.DrawCube(cubeCenter, new Vector3(5f, 0.1f, 5f));
     }
 }
