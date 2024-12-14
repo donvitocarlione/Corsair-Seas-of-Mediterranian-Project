@@ -36,6 +36,11 @@ public class Ship : SeaEntityBase
         movementComponent = GetComponent<ShipMovement>();
         currentHealth = maxHealth;
 
+        ValidateComponents();
+    }
+
+    protected virtual void ValidateComponents()
+    {
         var collider = GetComponent<Collider>();
         if (collider == null)
         {
@@ -72,7 +77,7 @@ public class Ship : SeaEntityBase
     public virtual void SetOwner(IShipOwner newOwner)
     {
         Debug.Log($"[Ship] Setting owner for {gameObject.name} to {(newOwner != null ? newOwner.GetType().Name : "null")}");
-        if (owner != null && !ReferenceEquals(owner, newOwner))
+        if (owner != null && (object)owner != (object)newOwner)
         {
             owner.RemoveShip(this);
         }
@@ -103,6 +108,7 @@ public class Ship : SeaEntityBase
         if (isSinking) return;
 
         currentHealth = Mathf.Max(0, currentHealth - damage);
+        Debug.Log($"[Ship] {gameObject.name} took {damage} damage. Health: {currentHealth}/{maxHealth}");
 
         if (currentHealth <= sinkingThreshold && !isSinking)
         {
@@ -112,6 +118,7 @@ public class Ship : SeaEntityBase
 
     protected virtual void StartSinking()
     {
+        Debug.Log($"[Ship] {gameObject.name} starting to sink");
         isSinking = true;
         StartCoroutine(SinkingRoutine());
     }
@@ -119,11 +126,13 @@ public class Ship : SeaEntityBase
     protected virtual IEnumerator SinkingRoutine()
     {
         WaitForEndOfFrame waitForEndOfFrame = new WaitForEndOfFrame();
+        float sinkStartTime = Time.time;
 
         while (currentHealth > 0)
         {
             currentHealth = Mathf.Max(0, currentHealth - Time.deltaTime);
 
+            // Create water splash effects
             if (waterSplashPrefab != null && 
                 Random.value < waterFloodRate * Time.deltaTime && 
                 buoyancyComponent != null)
@@ -131,6 +140,14 @@ public class Ship : SeaEntityBase
                 Vector3 splashPosition = transform.position + Random.insideUnitSphere * 2f;
                 splashPosition.y = buoyancyComponent.WaterLevel;
                 Instantiate(waterSplashPrefab, splashPosition, Quaternion.identity);
+            }
+
+            // Gradually tilt the ship
+            if (shipRigidbody != null)
+            {
+                float tiltProgress = (Time.time - sinkStartTime) / 5f; // 5 seconds to fully tilt
+                Quaternion targetRotation = Quaternion.Euler(Random.Range(-30f, 30f), transform.rotation.eulerAngles.y, Random.Range(-30f, 30f));
+                transform.rotation = Quaternion.Lerp(transform.rotation, targetRotation, tiltProgress);
             }
 
             yield return waitForEndOfFrame;
@@ -141,20 +158,39 @@ public class Ship : SeaEntityBase
 
     protected virtual void HandleShipDestroyed()
     {
-        if (shipRigidbody != null) shipRigidbody.isKinematic = true;
+        Debug.Log($"[Ship] {gameObject.name} has been destroyed!");
+
+        // Make ship static
+        if (shipRigidbody != null)
+        {
+            shipRigidbody.isKinematic = true;
+        }
         
+        // Disable visuals
         foreach (var renderer in GetComponentsInChildren<Renderer>())
         {
             renderer.enabled = false;
         }
         
-        if (isSelected) Deselect();
+        // Clear selection and ownership
+        if (isSelected)
+        {
+            Deselect();
+        }
         ClearOwner();
         
+        // Trigger events
         OnShipDestroyed?.Invoke();
-        Debug.Log($"Ship {Name} has been destroyed!");
         
-        ShipManager.Instance?.OnShipDestroyed(this);
+        // Notify ShipManager
+        if (ShipManager.Instance != null)
+        {
+            ShipManager.Instance.OnShipDestroyed(this);
+        }
+        else
+        {
+            Debug.LogWarning("[Ship] ShipManager instance not found when trying to report destruction");
+        }
     }
 
     protected override void OnDestroy()
@@ -168,13 +204,13 @@ public class Ship : SeaEntityBase
         if (sinkingThreshold > maxHealth)
         {
             sinkingThreshold = maxHealth * 0.2f;
-            Debug.LogWarning($"Adjusted sinking threshold to {sinkingThreshold}");
+            Debug.LogWarning($"[Ship] Adjusted sinking threshold to {sinkingThreshold}");
         }
 
         if (maxHealth <= 0)
         {
             maxHealth = 100f;
-            Debug.LogWarning("Adjusted max health to default value (100)");
+            Debug.LogWarning("[Ship] Adjusted max health to default value (100)");
         }
     }
 }
