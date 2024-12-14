@@ -11,7 +11,7 @@ public class FactionShipData
     public int initialShipCount = 3;
     public bool isPlayerFaction;
     public int initialPirateCount = 2;
-    public float spawnHeightAboveWater = 5f; // New field for spawn height
+    public float spawnHeightAboveWater = 5f;
 
     public bool Validate()
     {
@@ -36,8 +36,6 @@ public class FactionShipData
 
 public class ShipManager : MonoBehaviour
 {
-    public static ShipManager Instance { get; private set; }
-
     [Header("References")]
     public GameObject piratePrefab;
 
@@ -47,8 +45,25 @@ public class ShipManager : MonoBehaviour
     public int maxSpawnAttempts = 10;
     
     [Header("Spawn Settings")]
-    public float defaultSpawnHeightAboveWater = 5f; // Default height above water
-    public bool debugSpawnPositions = true; // Toggle for spawn position debugging
+    public float defaultSpawnHeightAboveWater = 5f;
+    public bool debugSpawnPositions = true;
+
+    private static ShipManager instance;
+    public static ShipManager Instance
+    {
+        get
+        {
+            if (instance == null)
+            {
+                instance = FindObjectOfType<ShipManager>();
+                if (instance == null)
+                {
+                    Debug.LogError("ShipManager instance not found!");
+                }
+            }
+            return instance;
+        }
+    }
 
     private Transform shipsParent;
     private Transform piratesParent;
@@ -62,121 +77,54 @@ public class ShipManager : MonoBehaviour
 
     void Awake()
     {
-        Debug.Log("[ShipManager] Awake start");
-        if (Instance == null)
+        if (instance == null)
         {
-            Instance = this;
+            instance = this;
             DontDestroyOnLoad(gameObject);
             InitializeManager();
             Debug.Log("[ShipManager] Instance initialized");
         }
-        else
+        else if (instance != this)
         {
             Debug.Log("[ShipManager] Duplicate instance destroyed");
             Destroy(gameObject);
         }
     }
 
-    // ... [Previous methods remain unchanged until GetSafeSpawnPosition] ...
-
-    private Vector3 GetSafeSpawnPosition(Vector3 center, float radius)
+    private void InitializeManager()
     {
-        if (waterBody == null)
-        {
-            Debug.LogError("[ShipManager] WaterBody is null when getting spawn position");
-            return center + Random.insideUnitSphere * radius * 0.5f;
-        }
-
-        float waterLevel = waterBody.GetYBound();
-        if (debugSpawnPositions)
-        {
-            Debug.Log($"[ShipManager] Water level at: {waterLevel}");
-        }
-
-        for (int i = 0; i < maxSpawnAttempts; i++)
-        {
-            // Get random position within radius but constrained to XZ plane
-            Vector2 randomCircle = Random.insideUnitCircle * radius;
-            Vector3 randomPos = new Vector3(
-                center.x + randomCircle.x,
-                0f, // Will be set properly below
-                center.z + randomCircle.y
-            );
-
-            // Set height above water
-            float spawnHeight = GetSpawnHeightForPosition(center, waterLevel);
-            randomPos.y = spawnHeight;
-
-            if (debugSpawnPositions)
-            {
-                Debug.Log($"[ShipManager] Trying spawn position: {randomPos}, Height above water: {spawnHeight - waterLevel}");
-            }
-
-            if (IsSafePosition(randomPos))
-            {
-                if (debugSpawnPositions)
-                {
-                    Debug.Log($"[ShipManager] Found safe spawn position at {randomPos}");
-                }
-                return randomPos;
-            }
-        }
-
-        // Fallback position
-        Vector3 fallbackPos = center + new Vector3(Random.Range(-radius * 0.5f, radius * 0.5f), 0f, Random.Range(-radius * 0.5f, radius * 0.5f));
-        fallbackPos.y = GetSpawnHeightForPosition(center, waterLevel);
+        Debug.Log("[ShipManager] Initializing manager");
+        CreateContainers();
+        isInitialized = ValidateConfiguration();
         
-        if (debugSpawnPositions)
+        if (!isInitialized)
         {
-            Debug.LogWarning($"[ShipManager] Using fallback spawn position: {fallbackPos}");
-        }
-        return fallbackPos;
-    }
-
-    private float GetSpawnHeightForPosition(Vector3 center, float waterLevel)
-    {
-        // Get the faction data for the spawn area
-        var data = factionShipData.Find(d => Vector3.Distance(d.spawnArea, center) < 0.1f);
-        float heightAboveWater = data != null ? data.spawnHeightAboveWater : defaultSpawnHeightAboveWater;
-        
-        // Ensure we're at least 1 unit above water
-        return Mathf.Max(waterLevel + heightAboveWater, waterLevel + 1f);
-    }
-
-    private bool IsSafePosition(Vector3 position)
-    {
-        // Check distance from other ships
-        foreach (Vector3 occupied in occupiedPositions)
-        {
-            if (Vector3.Distance(new Vector3(position.x, 0f, position.z), 
-                                new Vector3(occupied.x, 0f, occupied.z)) < minSpawnDistance)
-            {
-                if (debugSpawnPositions)
-                {
-                    Debug.Log($"[ShipManager] Position {position} too close to occupied position {occupied}");
-                }
-                return false;
-            }
+            Debug.LogError("[ShipManager] Initialization failed");
+            enabled = false;
+            return;
         }
 
-        // Add any additional safety checks here (e.g., terrain collision)
-        return true;
-    }
-
-    public void OnShipDestroyed(Ship ship)
-    {
-        if (ship != null)
+        if (Application.isPlaying)
         {
-            Debug.Log($"[ShipManager] Ship {ship.ShipName} destroyed, removing from occupied positions");
-            occupiedPositions.Remove(ship.transform.position);
+            InitializeWaterBody();
         }
     }
+
+    void Start()
+    {
+        if (instance == this && isInitialized && Application.isPlaying)
+        {
+            InitializePlayerFaction();
+        }
+    }
+
+    // ... [Previous methods remain unchanged] ...
 
     void OnDestroy()
     {
-        if (Instance == this)
+        if (instance == this)
         {
-            Instance = null;
+            instance = null;
         }
     }
 
@@ -185,8 +133,7 @@ public class ShipManager : MonoBehaviour
         if (minSpawnDistance < 0) minSpawnDistance = 50f;
         if (maxSpawnAttempts < 1) maxSpawnAttempts = 10;
         if (defaultSpawnHeightAboveWater < 1f) defaultSpawnHeightAboveWater = 5f;
-        
-        // Validate spawn heights in faction data
+
         if (factionShipData != null)
         {
             foreach (var data in factionShipData)
