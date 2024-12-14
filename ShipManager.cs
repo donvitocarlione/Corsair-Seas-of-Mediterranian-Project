@@ -36,6 +36,23 @@ public class FactionShipData
 
 public class ShipManager : MonoBehaviour
 {
+    private static ShipManager instance;
+    public static ShipManager Instance
+    {
+        get
+        {
+            if (instance == null)
+            {
+                instance = FindFirstObjectByType<ShipManager>();
+                if (instance == null)
+                {
+                    Debug.LogError("ShipManager instance not found!");
+                }
+            }
+            return instance;
+        }
+    }
+
     [Header("References")]
     public GameObject piratePrefab;
 
@@ -47,23 +64,6 @@ public class ShipManager : MonoBehaviour
     [Header("Spawn Settings")]
     public float defaultSpawnHeightAboveWater = 5f;
     public bool debugSpawnPositions = true;
-
-    private static ShipManager instance;
-    public static ShipManager Instance
-    {
-        get
-        {
-            if (instance == null)
-            {
-                instance = FindObjectOfType<ShipManager>();
-                if (instance == null)
-                {
-                    Debug.LogError("ShipManager instance not found!");
-                }
-            }
-            return instance;
-        }
-    }
 
     private Transform shipsParent;
     private Transform piratesParent;
@@ -118,7 +118,124 @@ public class ShipManager : MonoBehaviour
         }
     }
 
-    // ... [Previous methods remain unchanged] ...
+    private void CreateContainers()
+    {
+        shipsParent = new GameObject("Ships").transform;
+        shipsParent.parent = transform;
+        
+        piratesParent = new GameObject("Pirates").transform;
+        piratesParent.parent = transform;
+        Debug.Log("[ShipManager] Created containers");
+    }
+
+    private bool ValidateConfiguration()
+    {
+        Debug.Log("[ShipManager] Validating configuration");
+        if (piratePrefab == null)
+        {
+            Debug.LogError("[ShipManager] Missing pirate prefab!");
+            return false;
+        }
+
+        if (factionShipData == null || factionShipData.Count == 0)
+        {
+            Debug.LogError("[ShipManager] No faction data configured!");
+            return false;
+        }
+
+        foreach (var data in factionShipData)
+        {
+            Debug.Log($"[ShipManager] Faction config - Type: {data.faction}, IsPlayerFaction: {data.isPlayerFaction}, Ships: {data.initialShipCount}, Pirates: {data.initialPirateCount}");
+        }
+
+        return factionShipData.TrueForAll(data => data.Validate());
+    }
+
+    private void InitializeWaterBody()
+    {
+        waterBody = FindFirstObjectByType<WaterBody>();
+        if (waterBody == null)
+        {
+            Debug.LogError("[ShipManager] No WaterBody found in scene!");
+            enabled = false;
+        }
+        Debug.Log("[ShipManager] WaterBody initialized");
+    }
+
+    private void InitializePlayerFaction()
+    {
+        Debug.Log("[ShipManager] Initializing player faction");
+        var playerData = factionShipData.Find(data => data.isPlayerFaction);
+        if (playerData == null)
+        {
+            Debug.LogError("[ShipManager] No player faction configured!");
+            return;
+        }
+
+        playerFaction = playerData.faction;
+        Debug.Log($"[ShipManager] Player faction set to: {playerFaction}");
+        
+        playerInstance = FindFirstObjectByType<Player>();
+        if (playerInstance == null)
+        {
+            Debug.LogError("[ShipManager] No Player component found!");
+            return;
+        }
+
+        playerInstance.SetFaction(playerFaction);
+        Debug.Log($"[ShipManager] Player instance found and faction set to {playerFaction}");
+        
+        InitializeAllFactions();
+    }
+
+    private void InitializeAllFactions()
+    {
+        Debug.Log("[ShipManager] Initializing all factions");
+        foreach (var data in factionShipData)
+        {
+            Debug.Log($"[ShipManager] Initializing faction: {data.faction} (IsPlayerFaction: {data.isPlayerFaction})");
+            if (data.isPlayerFaction)
+            {
+                InitializePlayerShips(data);
+            }
+            else
+            {
+                InitializePiratesForFaction(data);
+            }
+        }
+    }
+
+    private void InitializePlayerShips(FactionShipData data)
+    {
+        Debug.Log($"[ShipManager] Initializing player ships for faction {data.faction}");
+        if (playerInstance == null)
+        {
+            Debug.LogError("[ShipManager] Cannot initialize player ships - playerInstance is null");
+            return;
+        }
+
+        for (int i = 0; i < data.initialShipCount; i++)
+        {
+            Debug.Log($"[ShipManager] Spawning player ship {i + 1}/{data.initialShipCount}");
+            if (SpawnShipForFaction(data.faction) is Ship ship)
+            {
+                playerInstance.AddShip(ship);
+                Debug.Log($"[ShipManager] Added ship {ship.ShipName} to player fleet");
+            }
+        }
+    }
+
+    public void OnShipDestroyed(Ship ship)
+    {
+        if (ship != null)
+        {
+            Debug.Log($"[ShipManager] Ship {ship.ShipName} destroyed, removing from occupied positions");
+            occupiedPositions.Remove(ship.transform.position);
+            Destroy(ship.gameObject, 2f); // Delayed destruction for effects
+        }
+    }
+
+    // ... [Previous spawn and initialization methods remain unchanged] ...
 
     void OnDestroy()
     {
