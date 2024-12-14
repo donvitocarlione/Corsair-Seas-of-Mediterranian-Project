@@ -160,7 +160,7 @@ public class Pirate : SeaEntityBase, IShipOwner
         {
             foreach (var ownedShip in ownedShips)
             {
-                if (ownedShip != null && !ReferenceEquals(ownedShip, ship) && ownedShip.IsSelected)
+                if (ownedShip != null && (object)ownedShip != (object)ship && ownedShip.IsSelected)
                 {
                     ownedShip.Deselect();
                 }
@@ -180,7 +180,6 @@ public class Pirate : SeaEntityBase, IShipOwner
 
         if (ownedShips == null) return;
         
-        // Update faction for all owned ships
         foreach (var ship in ownedShips.ToArray())
         {
             if (ship != null)
