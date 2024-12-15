@@ -24,10 +24,29 @@ public class ShipSelectionHandler : MonoBehaviour
             }
         }
 
-        selectionManager = FindObjectOfType<SelectionManager>();
+        selectionManager = FindFirstObjectByType<SelectionManager>();
         if (selectionManager == null)
         {
             Debug.LogError("[ShipSelectionHandler] SelectionManager not found in scene!");
+        }
+    }
+
+    public bool Select()
+    {
+        ApplySelectedMaterial();
+        if (selectionManager != null)
+        {
+            selectionManager.ShowSelectionAt(transform);
+        }
+        return true;
+    }
+
+    public void Deselect()
+    {
+        RestoreOriginalMaterials();
+        if (selectionManager != null)
+        {
+            selectionManager.HideSelection();
         }
     }
 
@@ -38,11 +57,7 @@ public class ShipSelectionHandler : MonoBehaviour
             Debug.Log($"[ShipSelectionHandler] Ship {gameObject.name} clicked");
             Player player = (Player)ship.ShipOwner;
             player.SelectShip(ship);
-            ApplySelectedMaterial();
-            if (selectionManager != null)
-            {
-                selectionManager.ShowSelectionAt(transform.position);
-            }
+            Select();
         }
         else
         {

@@ -8,7 +8,7 @@ public class InputManager : MonoBehaviour
 
     private void Start()
     {
-        player = FindObjectOfType<Player>();
+        player = FindFirstObjectByType<Player>();
         if (player == null)
         {
             Debug.LogError("[InputManager] No Player found in scene!");
