@@ -11,12 +11,13 @@ public class ShipMovement : MonoBehaviour
     [Header("Movement Smoothing")]
     [SerializeField] private float rotationSmoothTime = 0.3f;
     [SerializeField] private float velocitySmoothTime = 0.3f;
-    [SerializeField] private float heightSmoothTime = 0.5f;  // Added for smooth height adjustments
+    [SerializeField] private float heightSmoothTime = 0.5f;
     
     [Header("Water Interaction")]
-    [SerializeField] private float waterLevel = 0f;  // Default water level
-    [SerializeField] private float buoyancyOffset = 0.5f;  // How much of the ship sits below water
-    [SerializeField] private float waterDrag = 0.95f;  // Added water resistance
+    [SerializeField] private float waterLevel = 0f;
+    [SerializeField] private float buoyancyOffset = 0.5f;
+    [SerializeField] private float waterDrag = 0.95f;
+    [SerializeField] private float stoppingThreshold = 0.1f;  // Added threshold for stopping
     
     private Vector3 targetPosition;
     private float currentSpeed;
@@ -50,7 +51,7 @@ public class ShipMovement : MonoBehaviour
         // Configure rigidbody for water movement
         rb.drag = waterDrag;
         rb.angularDrag = waterDrag;
-        rb.useGravity = false;  // We'll handle vertical positioning ourselves
+        rb.useGravity = false;
         
         Debug.Log($"[ShipMovement] Initialized on {gameObject.name}");
     }
@@ -61,8 +62,13 @@ public class ShipMovement : MonoBehaviour
         {
             MoveTowardsTarget();
         }
+        else
+        {
+            // When not moving, actively dampen any residual velocity
+            rb.velocity = Vector3.Lerp(rb.velocity, Vector3.zero, Time.fixedDeltaTime * 5f);
+            rb.angularVelocity = Vector3.Lerp(rb.angularVelocity, Vector3.zero, Time.fixedDeltaTime * 5f);
+        }
         
-        // Always maintain proper height above water
         MaintainWaterLevel();
     }
     
@@ -76,10 +82,10 @@ public class ShipMovement : MonoBehaviour
     
     public void SetTargetPosition(Vector3 position)
     {
-        // Ensure target is at water level
         position.y = waterLevel + buoyancyOffset;
         targetPosition = position;
         isMoving = true;
+        currentSpeed = rb.velocity.magnitude;  // Initialize with current speed for smooth transitions
         Debug.Log($"[ShipMovement] Set target position for {gameObject.name} to {position}");
     }
     
@@ -88,12 +94,17 @@ public class ShipMovement : MonoBehaviour
         if (rb == null) return;
         
         Vector3 directionToTarget = (targetPosition - transform.position);
-        directionToTarget.y = 0; // Keep movement in horizontal plane
+        directionToTarget.y = 0;
         float distanceToTarget = directionToTarget.magnitude;
         
-        if (distanceToTarget < 0.1f)
+        // Check if we should stop
+        if (distanceToTarget <= stoppingDistance)
         {
-            return;
+            if (rb.velocity.magnitude < stoppingThreshold)
+            {
+                StopShip();
+                return;
+            }
         }
         
         directionToTarget.Normalize();
@@ -111,28 +122,38 @@ public class ShipMovement : MonoBehaviour
         transform.rotation = Quaternion.Euler(0, smoothedRotation, 0);
         
         // Update speed based on distance
-        float targetSpeed = distanceToTarget > stoppingDistance ? maxSpeed : maxSpeed * (distanceToTarget / stoppingDistance);
+        float targetSpeed = distanceToTarget > stoppingDistance ? 
+            maxSpeed : 
+            maxSpeed * (distanceToTarget / stoppingDistance);
+        
         currentSpeed = Mathf.SmoothDamp(currentSpeed, targetSpeed, ref currentVelocity.x, velocitySmoothTime);
         
-        // Calculate movement force
-        Vector3 movementForce = transform.forward * currentSpeed;
+        // Calculate movement force with gradual reduction near target
+        float distanceRatio = Mathf.Clamp01(distanceToTarget / stoppingDistance);
+        Vector3 movementForce = transform.forward * currentSpeed * distanceRatio;
         
         // Apply force with water resistance
         rb.AddForce(movementForce * (1f - waterDrag * Time.fixedDeltaTime), ForceMode.Acceleration);
-        
-        // Handle stopping
-        if (distanceToTarget <= stoppingDistance && currentSpeed < 0.1f)
-        {
-            isMoving = false;
-            currentSpeed = 0f;
-            Debug.Log($"[ShipMovement] {gameObject.name} reached target");
-        }
         
         if (Debug.isDebugBuild)
         {
             Debug.DrawLine(transform.position, targetPosition, Color.yellow);
             Debug.DrawRay(transform.position, movementForce, Color.green);
         }
+    }
+    
+    private void StopShip()
+    {
+        isMoving = false;
+        currentSpeed = 0f;
+        currentVelocity = Vector3.zero;
+        rotationVelocity = 0f;
+        
+        // Immediately zero out physics velocities
+        rb.velocity = Vector3.zero;
+        rb.angularVelocity = Vector3.zero;
+        
+        Debug.Log($"[ShipMovement] {gameObject.name} reached target and stopped");
     }
     
     private void OnDrawGizmosSelected()
