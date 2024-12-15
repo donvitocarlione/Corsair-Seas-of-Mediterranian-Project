@@ -2,7 +2,8 @@ using UnityEngine;
 
 public class InputManager : MonoBehaviour
 {
-    [SerializeField] private LayerMask groundLayer;
+    [SerializeField] private LayerMask surfaceLayer;  // Changed from groundLayer to surfaceLayer
+    [SerializeField] private float waterLevel = 0f;   // Added water level reference
     [SerializeField] private Camera mainCamera;
     private Player player;
 
@@ -51,24 +52,41 @@ public class InputManager : MonoBehaviour
         Ray ray = mainCamera.ScreenPointToRay(Input.mousePosition);
         RaycastHit hit;
 
-        if (Physics.Raycast(ray, out hit, Mathf.Infinity, groundLayer))
+        // First try to hit the surface layer
+        if (Physics.Raycast(ray, out hit, Mathf.Infinity, surfaceLayer))
         {
-            Debug.Log($"[InputManager] Ray hit at position: {hit.point}");
-            ShipMovement movement = selectedShip.GetComponent<ShipMovement>();
-            
-            if (movement != null)
+            SetShipTargetPosition(selectedShip, hit.point);
+        }
+        // If no surface hit, project the ray to the water plane
+        else
+        {
+            Plane waterPlane = new Plane(Vector3.up, new Vector3(0, waterLevel, 0));
+            float enter;
+            if (waterPlane.Raycast(ray, out enter))
             {
-                movement.SetTargetPosition(hit.point);
-                Debug.Log($"[InputManager] Set target position for {selectedShip.name} to {hit.point}");
+                Vector3 hitPoint = ray.GetPoint(enter);
+                SetShipTargetPosition(selectedShip, hitPoint);
             }
             else
             {
-                Debug.LogError($"[InputManager] Selected ship {selectedShip.name} has no ShipMovement component!");
+                Debug.Log("[InputManager] Could not determine target position on water surface");
             }
+        }
+    }
+
+    private void SetShipTargetPosition(Ship ship, Vector3 position)
+    {
+        ShipMovement movement = ship.GetComponent<ShipMovement>();
+        if (movement != null)
+        {
+            // Ensure the target position is at water level
+            position.y = waterLevel;
+            movement.SetTargetPosition(position);
+            Debug.Log($"[InputManager] Set target position for {ship.name} to {position}");
         }
         else
         {
-            Debug.Log("[InputManager] Ray did not hit ground layer");
+            Debug.LogError($"[InputManager] Selected ship {ship.name} has no ShipMovement component!");
         }
     }
 }
