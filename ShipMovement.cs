@@ -1,210 +1,73 @@
 using UnityEngine;
 
-public enum ShipState
-{
-    Idle,
-    Moving,
-    Turning,
-    Stopping
-}
-
 public class ShipMovement : MonoBehaviour
 {
-    [Header("Ship Characteristics")]
-    public float mass = 1000f;
-    public float windResistance = 1f;
-    public float waterResistance = 2f;
-    public float minSpeedForTurning = 0.1f;
+    [SerializeField] private float maxSpeed = 10f;
+    [SerializeField] private float acceleration = 5f;
+    [SerializeField] private float rotationSpeed = 2f;
+    [SerializeField] private float stoppingDistance = 1f;
 
-    [Header("Movement Settings")]
-    public float baseSpeed = 5f;
-    public float baseTurnSpeed = 90f;
-    public float acceleration = 1f;
-    public float deceleration = 0.5f;
-    public float stoppingDistance = 1f;
-
-    [Header("Movement Modifiers")]
-    public float speedMultiplier = 1f;
-    public float turnSpeedMultiplier = 1f;
-    public bool isMoving { get; private set; }
-
-    private Rigidbody rb;
     private Vector3 targetPosition;
-    private Vector3 currentVelocity;
-    private Quaternion targetRotation;
-    private ShipState currentState = ShipState.Idle;
-    private float currentSpeed = 0f;
+    private float currentSpeed;
+    private bool isMoving;
+    private Rigidbody rb;
 
-    void Start()
+    private void Start()
     {
         rb = GetComponent<Rigidbody>();
         if (rb == null)
         {
-            Debug.LogError("Ship needs a Rigidbody!");
-            enabled = false;
-            return;
+            Debug.LogError($"[ShipMovement] No Rigidbody found on {gameObject.name}");
         }
-
-        InitializePhysics();
+        targetPosition = transform.position;
+        Debug.Log($"[ShipMovement] Initialized on {gameObject.name}");
     }
 
-    private void InitializePhysics()
+    private void FixedUpdate()
     {
-        rb.useGravity = true;
-        rb.mass = mass;
-        rb.linearDamping = waterResistance;
-        rb.angularDamping = windResistance;
-        rb.constraints = RigidbodyConstraints.FreezeRotationX | 
-                        RigidbodyConstraints.FreezeRotationZ;
-    }
-
-    public void ApplyNavigationBonus(float bonus)
-    {
-        speedMultiplier = bonus;
-        turnSpeedMultiplier = Mathf.Lerp(1f, bonus, 0.5f);
-    }
-
-    public void ResetNavigationBonus()
-    {
-        speedMultiplier = 1f;
-        turnSpeedMultiplier = 1f;
+        if (isMoving)
+        {
+            MoveTowardsTarget();
+        }
     }
 
     public void SetTargetPosition(Vector3 position)
     {
-         Debug.Log($"[ShipMovement] Setting target position to {position}");
         targetPosition = position;
-        targetPosition.y = transform.position.y;
         isMoving = true;
-        currentState = ShipState.Moving;
-
-        Vector3 directionToTarget = (targetPosition - transform.position).normalized;
-        if (directionToTarget != Vector3.zero)
-        {
-            float targetAngle = Mathf.Atan2(directionToTarget.x, directionToTarget.z) * Mathf.Rad2Deg;
-            targetRotation = Quaternion.Euler(0, targetAngle, 0);
-             currentState = ShipState.Turning;
-             Debug.Log($"[ShipMovement] Setting ship state to turning to {targetRotation.eulerAngles}");
-        }
-        
-    }
-
-    public void StopMovement()
-    {
-         Debug.Log($"[ShipMovement] Stopping movement");
-        targetPosition = Vector3.zero;
-        isMoving = false;
-        currentVelocity = Vector3.zero;
-        currentState = ShipState.Stopping;
-        currentSpeed = 0f;
-    }
-
-    void FixedUpdate()
-    {
-         Debug.Log($"[ShipMovement] FixedUpdate state is {currentState}");
-        switch (currentState)
-        {
-            case ShipState.Moving:
-            case ShipState.Turning:
-                RotateTowardsTarget();
-                MoveTowardsTarget();
-                break;
-                
-            case ShipState.Stopping:
-                ApplyBraking();
-                break;
-        }
-        
-        ApplyWaterPhysics();
-        ApplyWindPhysics();
-    }
-
-    private void RotateTowardsTarget()
-    {
-         Debug.Log($"[ShipMovement] Rotating to {targetRotation.eulerAngles} current {transform.rotation.eulerAngles}");
-        if (currentSpeed < minSpeedForTurning)
-        {
-            return;
-        }
-        
-        float currentTurnSpeed = baseTurnSpeed * turnSpeedMultiplier;
-        transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, 
-            currentTurnSpeed * Time.fixedDeltaTime);
-
-        if (Quaternion.Angle(transform.rotation, targetRotation) < 1f)
-        {
-            currentState = ShipState.Moving;
-             Debug.Log($"[ShipMovement] Rotation completed, ship is moving");
-        }
+        Debug.Log($"[ShipMovement] Set target position for {gameObject.name} to {position}");
     }
 
     private void MoveTowardsTarget()
     {
-         Debug.Log($"[ShipMovement] Moving to {targetPosition}, speed {currentSpeed}");
-        if (!isMoving) return;
-        
-        float distanceToTarget = Vector3.Distance(transform.position, targetPosition);
-        
-         if (distanceToTarget <= stoppingDistance)
+        if (rb == null) return;
+
+        Vector3 direction = (targetPosition - transform.position).normalized;
+        float distance = Vector3.Distance(transform.position, targetPosition);
+
+        // Rotate towards target
+        Quaternion targetRotation = Quaternion.LookRotation(direction);
+        transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, rotationSpeed * Time.fixedDeltaTime);
+
+        // Update speed
+        if (distance > stoppingDistance)
         {
-           Debug.Log($"[ShipMovement] Distance is less than {stoppingDistance}, stopping ship");
-           StopMovement();
-           return;
+            currentSpeed = Mathf.Min(currentSpeed + acceleration * Time.fixedDeltaTime, maxSpeed);
         }
-        
-        // Calculate desired speed based on distance
-        float desiredSpeed = Mathf.Min(
-            baseSpeed * speedMultiplier,
-            Mathf.Sqrt(2f * acceleration * distanceToTarget)
-        );
-        
-        // Apply smooth acceleration/deceleration
-        currentSpeed = Mathf.MoveTowards(
-            currentSpeed,
-            desiredSpeed,
-            (desiredSpeed > currentSpeed ? acceleration : deceleration) * Time.fixedDeltaTime
-        );
-        
-        // Calculate movement direction
-        Vector3 moveDirection = transform.forward;
-        Vector3 targetVelocity = moveDirection * currentSpeed;
-        
+        else
+        {
+            currentSpeed = Mathf.Max(currentSpeed - acceleration * Time.fixedDeltaTime, 0);
+            if (currentSpeed == 0)
+            {
+                isMoving = false;
+                Debug.Log($"[ShipMovement] {gameObject.name} reached target");
+            }
+        }
+
         // Apply movement
-        rb.linearVelocity = Vector3.Lerp(rb.linearVelocity, targetVelocity, Time.fixedDeltaTime);
-    }
+        Vector3 movement = transform.forward * currentSpeed * Time.fixedDeltaTime;
+        rb.MovePosition(rb.position + movement);
 
-    private void ApplyWaterPhysics()
-    {
-        // Apply water resistance based on speed
-        float resistance = waterResistance * rb.linearVelocity.magnitude * rb.linearVelocity.magnitude;
-        rb.AddForce(-rb.linearVelocity.normalized * resistance);
-        
-        // Apply wave effects
-        float waveHeight = Mathf.Sin(Time.time * 0.5f) * 0.1f;
-        rb.AddForce(Vector3.up * waveHeight, ForceMode.Acceleration);
-    }
-    
-    private void ApplyWindPhysics()
-    {
-        // Simplified wind effect (you can integrate with a weather system later)
-        Vector3 windDirection = new Vector3(Mathf.Sin(Time.time * 0.1f), 0, Mathf.Cos(Time.time * 0.1f));
-        float windStrength = 0.5f + Mathf.Sin(Time.time * 0.05f) * 0.5f;
-        
-        // Calculate wind effect based on ship's orientation
-        float windEffect = Vector3.Dot(windDirection, transform.forward);
-        rb.AddForce(windDirection * windStrength * windEffect * windResistance);
-    }
-
-    private void ApplyBraking()
-    {
-        if (rb.linearVelocity.magnitude < 0.01f)
-        {
-             Debug.Log($"[ShipMovement] Velocity is less than 0.01, stopping");
-            rb.linearVelocity = Vector3.zero;
-            currentState = ShipState.Idle;
-            return;
-        }
-        
-        rb.AddForce(-rb.linearVelocity * deceleration, ForceMode.Acceleration);
+        Debug.Log($"[ShipMovement] {gameObject.name} moving at speed {currentSpeed} towards {targetPosition}");
     }
 }
