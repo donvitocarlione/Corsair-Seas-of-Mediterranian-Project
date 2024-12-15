@@ -3,41 +3,35 @@ using UnityEngine;
 public class Buoyancy : MonoBehaviour
 {
     [Header("Buoyancy Settings")]
-    public float waterDensity = 1000f;  // Standard water density in kg/m³
+    [SerializeField] private float waterDensity = 1000f;
     [SerializeField] private float waterLevelY = 0f;
-    public float buoyancyForce = 1000f;  // Starting with ship mass as base force
-    public float waterDrag = 2f;
-    public float waterAngularDrag = 2f;
+    [SerializeField] private float buoyancyForce = 1000f;
+    [SerializeField] private float waterDrag = 1f;
+    [SerializeField] private float waterAngularDrag = 1f;
     
     [Header("Wave Settings")]
-    public bool useWaves = true;
-    public float waveHeight = 1f;  // Increased for better visibility
-    public float waveFrequency = 1f;
-    public float waveSpeed = 1f;
-    public Vector2 waveDirection = new Vector2(1f, 1f);
-    public float secondaryWaveRatio = 0.8f;
+    [SerializeField] private bool useWaves = true;
+    [SerializeField] private float waveHeight = 0.5f;
+    [SerializeField] private float waveFrequency = 1f;
+    [SerializeField] private float waveSpeed = 1f;
+    [SerializeField] private Vector2 waveDirection = new Vector2(1f, 1f);
+    [SerializeField] private float secondaryWaveRatio = 0.8f;
     
     [Header("Advanced Settings")]
-    public float sideResistance = 5f;  // Increased side resistance
-    public float turningResistance = 3f;  // Increased turning resistance
-    public int buoyancyPoints = 8;  // Increased number of points for better stability
+    [SerializeField] private float sideResistance = 2f;
+    [SerializeField] private float turningResistance = 1f;
+    [SerializeField] private int buoyancyPoints = 8;
     
     [Header("Stabilization")]
-    public float rollStability = 0.5f;  // Increased roll stability
-    public float pitchStability = 0.3f;  // Increased pitch stability
-    
-    [Header("Shader Sync Settings")]
-    public Material waterMaterial;
-    private readonly int WaveHeightProperty = Shader.PropertyToID("Vector1_7273530c27a34c9f8ee5723b84f96baa");
-    private readonly int WaveFrequencyProperty = Shader.PropertyToID("Vector1_6c82dffdd68049bcb019d3a9c64c92a0");
-    private readonly int WaveSpeedProperty = Shader.PropertyToID("Vector1_6269b1025b26473ca8bc61634f34b537");
-    private readonly int WaveDirectionProperty = Shader.PropertyToID("Vector2_4351ac2be1d74054986ec5378db9d578");
+    [SerializeField] private float rollStability = 0.3f;
+    [SerializeField] private float pitchStability = 0.2f;
+    [SerializeField] private float uprightForce = 1f;
     
     [Header("Debug Info")]
     public float boatSubmergedPercentage = 0f;
     public bool isInWater;
     public Vector3 waterMovement;
-    public bool showDebugLogs = false;  // Toggle for debug logs
+    public bool showDebugLogs = false;
     
     private Rigidbody rb;
     private Collider boatCollider;
@@ -45,10 +39,13 @@ public class Buoyancy : MonoBehaviour
     private float initialAngularDrag;
     private float timeOffset;
     private Vector3[] buoyancyPointsPositions;
-
+    private float[] submersionHistory;
+    private const int historyLength = 10;
+    private int historyIndex = 0;
+    
     public float WaterLevel => waterLevelY;
     
-    void Start()
+    private void Start()
     {
         rb = GetComponent<Rigidbody>();
         boatCollider = GetComponent<Collider>();
@@ -60,68 +57,46 @@ public class Buoyancy : MonoBehaviour
             return;
         }
         
-        initialDrag = rb.linearDamping;
-        initialAngularDrag = rb.angularDamping;
+        initialDrag = rb.drag;
+        initialAngularDrag = rb.angularDrag;
+        timeOffset = Random.Range(0f, 100f);
+        submersionHistory = new float[historyLength];
         
-        // Set initial position slightly above water
+        // Ensure ship starts above water
         if (transform.position.y <= waterLevelY)
         {
-            transform.position = new Vector3(transform.position.x, waterLevelY + 0.1f, transform.position.z);
+            transform.position = new Vector3(transform.position.x, waterLevelY + 0.5f, transform.position.z);
         }
-        
-        rb.mass = 1000f;
-        rb.useGravity = true;
-        rb.constraints = RigidbodyConstraints.None;
-        
-        timeOffset = Random.Range(0f, 100f);
         
         InitializeBuoyancyPoints();
         
-        if (waterMaterial != null)
+        // Initialize history
+        for (int i = 0; i < historyLength; i++)
         {
-            SyncWithShader();
-        }
-
-        Debug.Log("Buoyancy System Initialized - Ship Mass: " + rb.mass + "kg, Water Density: " + waterDensity + "kg/m³");
-    }
-    
-    void SyncWithShader()
-    {
-        if (waterMaterial != null)
-        {
-            waveHeight = waterMaterial.GetFloat(WaveHeightProperty);
-            waveFrequency = waterMaterial.GetFloat(WaveFrequencyProperty);
-            waveSpeed = waterMaterial.GetFloat(WaveSpeedProperty);
-            waveDirection = waterMaterial.GetVector(WaveDirectionProperty);
-            
-            if (showDebugLogs)
-            {
-                Debug.Log($"Shader Sync - Wave Height: {waveHeight}, Frequency: {waveFrequency}, Speed: {waveSpeed}");
-            }
+            submersionHistory[i] = 0f;
         }
     }
     
-    void InitializeBuoyancyPoints()
+    private void InitializeBuoyancyPoints()
     {
         buoyancyPointsPositions = new Vector3[buoyancyPoints];
         Bounds bounds = boatCollider.bounds;
         float length = bounds.size.z;
         float width = bounds.size.x;
         
-        // Create more distributed points for better stability
+        // Create distributed points for better stability
         for (int i = 0; i < buoyancyPoints; i++)
         {
-            float xPos = (i % 2 == 0) ? -width/3 : width/3;
+            float xPos = (i % 2 == 0) ? -width/4 : width/4;
             float zPos = (length/2) * ((float)i / buoyancyPoints - 0.5f);
-            buoyancyPointsPositions[i] = new Vector3(xPos, -bounds.size.y/2, zPos);
+            float yPos = -bounds.size.y/3; // Moved up slightly for better stability
+            buoyancyPointsPositions[i] = new Vector3(xPos, yPos, zPos);
         }
     }
     
-    void FixedUpdate()
+    private void FixedUpdate()
     {
-        UpdateWaterLevel();
-        
-        float totalSubmerged = 0;
+        float totalSubmerged = 0f;
         Vector3 totalBuoyancyForce = Vector3.zero;
         
         foreach (Vector3 point in buoyancyPointsPositions)
@@ -134,147 +109,173 @@ public class Buoyancy : MonoBehaviour
                 float submersion = Mathf.Clamp01((waveHeight - worldPoint.y) / 1f);
                 totalSubmerged += submersion;
                 
-                // Improved buoyancy calculation
-                float depthFactor = Mathf.Clamp01((waveHeight - worldPoint.y) / 2f);
-                float displacementMultiplier = depthFactor * (waterDensity / 1000f);
+                // Calculate buoyancy force with improved depth handling
+                float depthFactor = Mathf.Exp(-Mathf.Abs(waveHeight - worldPoint.y));
+                float displacementMultiplier = submersion * (waterDensity / 1000f) * depthFactor;
+                
+                // Base buoyancy force
                 Vector3 buoyancyForceAtPoint = Vector3.up * buoyancyForce * displacementMultiplier;
                 
-                Vector3 waveForce = CalculateWaveForce(worldPoint);
-                buoyancyForceAtPoint += waveForce * displacementMultiplier;
+                // Add wave influence
+                if (useWaves)
+                {
+                    Vector3 waveForce = CalculateWaveForce(worldPoint) * displacementMultiplier * 0.5f;
+                    buoyancyForceAtPoint += waveForce;
+                }
                 
                 rb.AddForceAtPosition(buoyancyForceAtPoint, worldPoint, ForceMode.Force);
                 totalBuoyancyForce += buoyancyForceAtPoint;
-                
-                if (showDebugLogs)
-                {
-                    Debug.Log($"Point {worldPoint} - Submersion: {submersion:F2}, Force: {buoyancyForceAtPoint.magnitude:F2}N");
-                }
             }
         }
         
-        boatSubmergedPercentage = totalSubmerged / buoyancyPoints;
-        isInWater = boatSubmergedPercentage > 0;
+        // Update submersion history
+        submersionHistory[historyIndex] = totalSubmerged / buoyancyPoints;
+        historyIndex = (historyIndex + 1) % historyLength;
+        
+        // Calculate average submersion for smoother transitions
+        float averageSubmersion = 0f;
+        for (int i = 0; i < historyLength; i++)
+        {
+            averageSubmersion += submersionHistory[i];
+        }
+        averageSubmersion /= historyLength;
+        
+        boatSubmergedPercentage = averageSubmersion;
+        isInWater = averageSubmersion > 0.1f;
         
         if (isInWater)
         {
             ApplyWaterResistance();
-            ApplyStabilizationForces();
-            
-            if (showDebugLogs)
-            {
-                Debug.Log($"Total Buoyancy Force: {totalBuoyancyForce.magnitude:F2}N, Submerged: {boatSubmergedPercentage:P0}");
-            }
+            ApplyStabilization();
         }
         else
         {
-            rb.linearDamping = initialDrag;
-            rb.angularDamping = initialAngularDrag;
+            rb.drag = initialDrag;
+            rb.angularDrag = initialAngularDrag;
         }
     }
     
-    Vector3 CalculateWaveForce(Vector3 worldPosition)
+    private Vector3 CalculateWaveForce(Vector3 worldPosition)
     {
         if (!useWaves) return Vector3.zero;
-
+        
+        float time = Time.time * waveSpeed + timeOffset;
         float dx = waveDirection.x * waveFrequency;
         float dz = waveDirection.y * waveFrequency;
-        float time = Time.time * waveSpeed + timeOffset;
         
-        float slopeX = Mathf.Cos(worldPosition.x * dx + time) * waveHeight;
-        float slopeZ = Mathf.Cos(worldPosition.z * dz + time) * waveHeight;
+        // Calculate wave slopes
+        float slopeX = -waveHeight * dx * Mathf.Sin(worldPosition.x * dx + time);
+        float slopeZ = -waveHeight * dz * Mathf.Sin(worldPosition.z * dz + time);
         
         return new Vector3(slopeX, 0, slopeZ) * waveSpeed;
     }
     
-    float CalculateWaveHeight(Vector3 worldPosition)
+    private float CalculateWaveHeight(Vector3 worldPosition)
     {
         if (!useWaves)
             return waterLevelY;
             
+        float time = Time.time * waveSpeed + timeOffset;
         float x = worldPosition.x * waveDirection.x;
         float z = worldPosition.z * waveDirection.y;
-        float time = Time.time * waveSpeed + timeOffset;
         
+        // Primary wave
         float wave1 = Mathf.Sin(x * waveFrequency + time);
-        float wave2 = Mathf.Sin(z * waveFrequency * secondaryWaveRatio + time * secondaryWaveRatio);
+        
+        // Secondary waves for more natural look
+        float wave2 = Mathf.Sin(z * waveFrequency * secondaryWaveRatio + time * 0.8f);
         float wave3 = Mathf.Sin((x + z) * waveFrequency * 0.5f + time * 1.2f);
         
-        float waveSum = (wave1 + wave2 + wave3) / 3f;
+        float waveSum = (wave1 * 0.6f + wave2 * 0.25f + wave3 * 0.15f);
         return waterLevelY + waveSum * waveHeight;
     }
     
-    void ApplyWaterResistance()
+    private void ApplyWaterResistance()
     {
-        rb.linearDamping = waterDrag * boatSubmergedPercentage;
-        rb.angularDamping = waterAngularDrag * boatSubmergedPercentage;
+        // Convert velocity to local space
+        Vector3 localVelocity = transform.InverseTransformDirection(rb.velocity);
         
-        Vector3 localVelocity = transform.InverseTransformDirection(rb.linearVelocity);
+        // Calculate drag forces
+        float submersionFactor = Mathf.Clamp01(boatSubmergedPercentage * 2f);
+        Vector3 dragForce = new Vector3(
+            -localVelocity.x * sideResistance,
+            -Mathf.Abs(localVelocity.y) * waterDrag,
+            -localVelocity.z * (sideResistance * 0.5f)
+        ) * submersionFactor;
         
-        // Improved directional resistance
-        Vector3 sideForce = -transform.right * localVelocity.x * sideResistance * boatSubmergedPercentage;
-        Vector3 forwardForce = -transform.forward * localVelocity.z * (sideResistance * 0.5f) * boatSubmergedPercentage;
-        rb.AddForce(sideForce + forwardForce, ForceMode.Force);
+        // Apply drag in world space
+        rb.AddRelativeForce(dragForce, ForceMode.Force);
         
-        Vector3 turnForce = -transform.up * rb.angularVelocity.y * turningResistance * boatSubmergedPercentage;
-        rb.AddTorque(turnForce, ForceMode.Force);
+        // Angular drag
+        Vector3 angularDragForce = -rb.angularVelocity * turningResistance * submersionFactor;
+        rb.AddTorque(angularDragForce, ForceMode.Force);
     }
     
-    void ApplyStabilizationForces()
+    private void ApplyStabilization()
     {
+        // Get current orientation
+        Vector3 up = transform.up;
+        Vector3 forward = transform.forward;
+        
+        // Calculate correction forces
+        float submersionFactor = Mathf.Clamp01(boatSubmergedPercentage * 2f);
+        
+        // Roll stabilization
         float currentRoll = Vector3.Dot(transform.right, Vector3.up);
-        Vector3 rollCorrection = transform.forward * -currentRoll * rollStability * boatSubmergedPercentage;
+        Vector3 rollCorrection = Vector3.Cross(transform.right, Vector3.up) * 
+                               currentRoll * rollStability * submersionFactor;
         
+        // Pitch stabilization
         float currentPitch = Vector3.Dot(transform.forward, Vector3.up);
-        Vector3 pitchCorrection = transform.right * -currentPitch * pitchStability * boatSubmergedPercentage;
+        Vector3 pitchCorrection = Vector3.Cross(transform.forward, Vector3.up) * 
+                                currentPitch * pitchStability * submersionFactor;
         
+        // Apply upright force
+        Vector3 uprightCorrection = Vector3.up * uprightForce * submersionFactor;
+        
+        // Apply all stabilization forces
         rb.AddTorque(rollCorrection + pitchCorrection, ForceMode.Force);
+        rb.AddForce(uprightCorrection, ForceMode.Force);
     }
     
-    void UpdateWaterLevel()
-    {
-        if (useWaves)
-        {
-            Vector3 centerPos = transform.position;
-            waterLevelY = CalculateWaveHeight(centerPos);
-        }
-    }
-    
-    void OnDrawGizmosSelected()
+    private void OnDrawGizmosSelected()
     {
         if (!Application.isPlaying || buoyancyPointsPositions == null) return;
         
-        Gizmos.color = Color.blue;
+        // Draw buoyancy points
         foreach (Vector3 point in buoyancyPointsPositions)
         {
             Vector3 worldPoint = transform.TransformPoint(point);
             float waveHeight = CalculateWaveHeight(worldPoint);
             
-            // Draw buoyancy points and their depth
-            Gizmos.DrawLine(worldPoint, new Vector3(worldPoint.x, waveHeight, worldPoint.z));
+            Gizmos.color = worldPoint.y < waveHeight ? Color.green : Color.red;
             Gizmos.DrawWireSphere(worldPoint, 0.1f);
             
-            // Show forces when point is submerged
+            // Draw water level at point
+            Gizmos.color = Color.blue;
+            Vector3 waterPoint = new Vector3(worldPoint.x, waveHeight, worldPoint.z);
+            Gizmos.DrawLine(worldPoint, waterPoint);
+            
+            // Draw forces when submerged
             if (worldPoint.y < waveHeight)
             {
-                Gizmos.color = Color.green;
-                Gizmos.DrawRay(worldPoint, Vector3.up * buoyancyForce * 0.001f);
+                Gizmos.color = Color.yellow;
+                Vector3 buoyancyForceVis = Vector3.up * buoyancyForce * 0.001f;
+                Gizmos.DrawRay(worldPoint, buoyancyForceVis);
                 
                 if (useWaves)
                 {
-                    Gizmos.color = Color.red;
-                    Vector3 waveForce = CalculateWaveForce(worldPoint);
+                    Gizmos.color = Color.cyan;
+                    Vector3 waveForce = CalculateWaveForce(worldPoint) * 0.1f;
                     Gizmos.DrawRay(worldPoint, waveForce);
                 }
-                
-                Gizmos.color = Color.blue;
             }
         }
         
-        // Visualize water level
+        // Draw water plane
         Gizmos.color = new Color(0f, 0.7f, 1f, 0.3f);
-        Vector3 shipPos = transform.position;
-        float shipWaterLevel = CalculateWaveHeight(shipPos);
-        Vector3 cubeCenter = new Vector3(shipPos.x, shipWaterLevel, shipPos.z);
-        Gizmos.DrawCube(cubeCenter, new Vector3(5f, 0.1f, 5f));
+        float waterLevel = CalculateWaveHeight(transform.position);
+        Vector3 center = new Vector3(transform.position.x, waterLevel, transform.position.z);
+        Gizmos.DrawCube(center, new Vector3(5f, 0.1f, 5f));
     }
 }
