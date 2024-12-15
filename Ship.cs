@@ -1,216 +1,134 @@
 using UnityEngine;
-using System.Collections;
-using UnityEngine.Events;
-using CSM.Base;
 
-public class Ship : SeaEntityBase
+[RequireComponent(typeof(ShipSelectionHandler))]
+public class Ship : MonoBehaviour
 {
-    [Header("Ship Properties")]
-    [SerializeField] protected float maxHealth = 100f;
-    [SerializeField] protected float sinkingThreshold = 20f;
-    [SerializeField] protected GameObject waterSplashPrefab;
-    [SerializeField] protected float waterFloodRate = 0.1f;
+    [SerializeField]
+    private string shipName = "Unnamed Ship";
+    [SerializeField]
+    private float maxHealth = 100f;
+    [SerializeField]
+    private float currentHealth;
+    
+    private ShipSelectionHandler selectionHandler;
+    private bool isSelected;
+    private bool isSinking;
+    private Pirate shipOwner;
 
-    protected float currentHealth;
-    protected bool isSelected;
-    protected bool isSinking;
-    protected IShipOwner owner;
-
-    protected Rigidbody shipRigidbody;
-    protected Buoyancy buoyancyComponent;
-    protected ShipMovement movementComponent;
-
-    public event UnityAction OnShipDestroyed;
-
-    public float Health => currentHealth;
+    public string ShipName => shipName;
+    public Pirate ShipOwner => shipOwner;
     public bool IsSelected => isSelected;
     public bool IsSinking => isSinking;
-    public IShipOwner ShipOwner => owner;
-    public string ShipName => Name;
+    public float CurrentHealth => currentHealth;
+    public float MaxHealth => maxHealth;
 
-    protected virtual void Awake()
+    private void Awake()
     {
-        Debug.Log($"[Ship] Awake called on {gameObject.name}");
-        shipRigidbody = GetComponent<Rigidbody>();
-        buoyancyComponent = GetComponent<Buoyancy>();
-        movementComponent = GetComponent<ShipMovement>();
+        Debug.Log($"[Ship] Initializing {shipName}");
         currentHealth = maxHealth;
-
-        ValidateComponents();
-    }
-
-    protected virtual void ValidateComponents()
-    {
-        var collider = GetComponent<Collider>();
-        if (collider == null)
-        {
-            Debug.LogError($"[Ship] No Collider found on {gameObject.name}");
-        }
-
-        var selectionHandler = GetComponent<ShipSelectionHandler>();
+        selectionHandler = GetComponent<ShipSelectionHandler>();
+        
         if (selectionHandler == null)
         {
-            Debug.LogError($"[Ship] No ShipSelectionHandler found on {gameObject.name}");
+            Debug.LogError($"[Ship] No ShipSelectionHandler found on {shipName}");
         }
-
-        Debug.Log($"[Ship] Components check for {gameObject.name}:\n" +
-                  $"- Rigidbody: {shipRigidbody != null}\n" +
-                  $"- Buoyancy: {buoyancyComponent != null}\n" +
-                  $"- Movement: {movementComponent != null}\n" +
-                  $"- Collider: {collider != null}\n" +
-                  $"- SelectionHandler: {selectionHandler != null}");
     }
 
-    protected override void Start()
+    public void SetOwner(Pirate owner)
     {
-        Debug.Log($"[Ship] Start called on {gameObject.name}");
-        base.Start();
+        Debug.Log($"[Ship] Setting owner for {shipName} to {(owner != null ? owner.GetType().Name : "null")}");
+        shipOwner = owner;
     }
 
-    public virtual void Initialize(FactionType newFaction, string newName)
+    public bool Select()
     {
-        Debug.Log($"[Ship] Initializing {gameObject.name} with faction {newFaction} and name {newName}");
-        SetFaction(newFaction);
-        SetName(newName);
-    }
-
-    public virtual void SetOwner(IShipOwner newOwner)
-    {
-        Debug.Log($"[Ship] Setting owner for {gameObject.name} to {(newOwner != null ? newOwner.GetType().Name : "null")}");
-        if (owner != null && (object)owner != (object)newOwner)
+        Debug.Log($"[Ship] Attempting to select {shipName}");
+        
+        if (isSinking)
         {
-            owner.RemoveShip(this);
+            Debug.LogWarning($"[Ship] Cannot select {shipName} - ship is sinking");
+            return false;
         }
 
-        owner = newOwner;
+        if (selectionHandler != null && selectionHandler.Select())
+        {
+            isSelected = true;
+            Debug.Log($"[Ship] Successfully selected {shipName}");
+            return true;
+        }
+        
+        Debug.LogWarning($"[Ship] Failed to select {shipName}");
+        return false;
     }
 
-    public virtual void ClearOwner()
+    public void Deselect()
     {
-        Debug.Log($"[Ship] Clearing owner for {gameObject.name}");
-        owner = null;
-    }
-
-    public virtual void Select()
-    {
-        Debug.Log($"[Ship] Selecting {gameObject.name}");
-        isSelected = true;
-    }
-
-    public virtual void Deselect()
-    {
-        Debug.Log($"[Ship] Deselecting {gameObject.name}");
+        Debug.Log($"[Ship] Deselecting {shipName}");
+        if (selectionHandler != null)
+        {
+            selectionHandler.Deselect();
+        }
         isSelected = false;
     }
 
-    public virtual void TakeDamage(float damage)
+    public void TakeDamage(float damage)
     {
-        if (isSinking) return;
-
+        Debug.Log($"[Ship] {shipName} taking {damage} damage");
         currentHealth = Mathf.Max(0, currentHealth - damage);
-        Debug.Log($"[Ship] {gameObject.name} took {damage} damage. Health: {currentHealth}/{maxHealth}");
+        
+        Debug.Log($"[Ship] {shipName} health: {currentHealth}/{maxHealth}");
 
-        if (currentHealth <= sinkingThreshold && !isSinking)
+        // Check if ship should start sinking
+        if (currentHealth <= 0 && !isSinking)
         {
             StartSinking();
         }
     }
 
-    protected virtual void StartSinking()
+    private void StartSinking()
     {
-        Debug.Log($"[Ship] {gameObject.name} starting to sink");
+        Debug.Log($"[Ship] {shipName} starting to sink");
         isSinking = true;
-        StartCoroutine(SinkingRoutine());
-    }
-
-    protected virtual IEnumerator SinkingRoutine()
-    {
-        WaitForEndOfFrame waitForEndOfFrame = new WaitForEndOfFrame();
-        float sinkStartTime = Time.time;
-
-        while (currentHealth > 0)
-        {
-            currentHealth = Mathf.Max(0, currentHealth - Time.deltaTime);
-
-            // Create water splash effects
-            if (waterSplashPrefab != null && 
-                Random.value < waterFloodRate * Time.deltaTime && 
-                buoyancyComponent != null)
-            {
-                Vector3 splashPosition = transform.position + Random.insideUnitSphere * 2f;
-                splashPosition.y = buoyancyComponent.WaterLevel;
-                Instantiate(waterSplashPrefab, splashPosition, Quaternion.identity);
-            }
-
-            // Gradually tilt the ship
-            if (shipRigidbody != null)
-            {
-                float tiltProgress = (Time.time - sinkStartTime) / 5f; // 5 seconds to fully tilt
-                Quaternion targetRotation = Quaternion.Euler(Random.Range(-30f, 30f), transform.rotation.eulerAngles.y, Random.Range(-30f, 30f));
-                transform.rotation = Quaternion.Lerp(transform.rotation, targetRotation, tiltProgress);
-            }
-
-            yield return waitForEndOfFrame;
-        }
-
-        HandleShipDestroyed();
-    }
-
-    protected virtual void HandleShipDestroyed()
-    {
-        Debug.Log($"[Ship] {gameObject.name} has been destroyed!");
-
-        // Make ship static
-        if (shipRigidbody != null)
-        {
-            shipRigidbody.isKinematic = true;
-        }
         
-        // Disable visuals
-        foreach (var renderer in GetComponentsInChildren<Renderer>())
-        {
-            renderer.enabled = false;
-        }
-        
-        // Clear selection and ownership
+        // Deselect if currently selected
         if (isSelected)
         {
             Deselect();
         }
-        ClearOwner();
-        
-        // Trigger events
-        OnShipDestroyed?.Invoke();
-        
-        // Notify ShipManager
-        if (ShipManager.Instance != null)
+
+        // Remove from owner's fleet
+        if (shipOwner != null)
         {
-            ShipManager.Instance.OnShipDestroyed(this);
+            Debug.Log($"[Ship] Removing {shipName} from owner's fleet");
+            shipOwner.RemoveShip(this);
         }
-        else
+
+        // Disable selection handler
+        if (selectionHandler != null)
         {
-            Debug.LogWarning("[Ship] ShipManager instance not found when trying to report destruction");
+            selectionHandler.enabled = false;
         }
     }
 
-    protected override void OnDestroy()
+    public void Repair(float amount)
     {
-        base.OnDestroy();
-        OnShipDestroyed = null;
-    }
-
-    protected virtual void OnValidate()
-    {
-        if (sinkingThreshold > maxHealth)
+        if (isSinking)
         {
-            sinkingThreshold = maxHealth * 0.2f;
-            Debug.LogWarning($"[Ship] Adjusted sinking threshold to {sinkingThreshold}");
+            Debug.LogWarning($"[Ship] Cannot repair {shipName} - ship is sinking");
+            return;
         }
 
-        if (maxHealth <= 0)
+        Debug.Log($"[Ship] Repairing {shipName} for {amount}");
+        currentHealth = Mathf.Min(maxHealth, currentHealth + amount);
+        Debug.Log($"[Ship] {shipName} health after repair: {currentHealth}/{maxHealth}");
+    }
+
+    private void OnValidate()
+    {
+        // Ensure currentHealth doesn't exceed maxHealth in the inspector
+        if (currentHealth > maxHealth)
         {
-            maxHealth = 100f;
-            Debug.LogWarning("[Ship] Adjusted max health to default value (100)");
+            currentHealth = maxHealth;
         }
     }
 }
