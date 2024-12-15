@@ -2,95 +2,162 @@ using UnityEngine;
 
 public class InputManager : MonoBehaviour
 {
-    private Ship selectedShip;
+    [SerializeField]
+    private LayerMask groundLayerMask = Physics.DefaultRaycastLayers;
+    [SerializeField]
     private Camera mainCamera;
+    [SerializeField]
+    private float cameraMovementSpeed = 10f;
+    [SerializeField]
+    private float cameraDragSpeed = 2f;
     
-    [SerializeField]
-    private LayerMask shipLayerMask;
-    [SerializeField]
-    private LayerMask groundLayerMask; // For right-click movement target detection
+    private Ship selectedShip;
+    private bool isDragging;
+    private Vector3 lastMousePosition;
 
     private void Start()
     {
-        mainCamera = Camera.main;
+        Debug.Log("[InputManager] Initializing");
         if (mainCamera == null)
         {
-            Debug.LogError("Main camera not found!");
-            return;
-        }
-
-        // Setup default layer masks if not set
-        if (shipLayerMask == 0)
-        {
-            shipLayerMask = LayerMask.GetMask("Ship");
-            Debug.LogWarning("Ship layer mask not set. Defaulting to 'Ship' layer.");
-        }
-
-        if (groundLayerMask == 0)
-        {
-            groundLayerMask = LayerMask.GetMask("Default", "Water"); // Add other ground layers as needed
-            Debug.LogWarning("Ground layer mask not set. Defaulting to 'Default' and 'Water' layers.");
-        }
-    }
-
-    public void OnShipSelected(Ship ship)
-    {
-        // Deselect previous ship if any
-        if (selectedShip != null)
-        {
-            selectedShip.Deselect();
-        }
-        
-        selectedShip = ship;
-        if (selectedShip != null)
-        {
-            selectedShip.Select();
+            mainCamera = Camera.main;
+            if (mainCamera == null)
+            {
+                Debug.LogError("[InputManager] No main camera found!");
+            }
         }
     }
 
     private void Update()
     {
-        HandleMouseInput();
+        if (mainCamera == null) return;
+
+        // Handle right-click for movement
+        if (Input.GetMouseButtonDown(1))
+        {
+            HandleRightClick();
+        }
+
+        // Handle left-click and drag for camera movement
+        if (Input.GetMouseButtonDown(0))
+        {
+            isDragging = true;
+            lastMousePosition = Input.mousePosition;
+        }
+        else if (Input.GetMouseButtonUp(0))
+        {
+            isDragging = false;
+        }
+
+        if (isDragging && Input.GetMouseButton(0))
+        {
+            HandleCameraDrag();
+        }
+
+        // Handle keyboard input
+        HandleKeyboardInput();
     }
 
-    private void HandleMouseInput()
+    private void HandleRightClick()
     {
-        // Only handle right-click when we have a selected ship
-        if (selectedShip == null) return;
-
-        if (Input.GetMouseButtonDown(1)) // Right mouse button
+        Debug.Log("[InputManager] Processing right click");
+        
+        if (selectedShip == null)
         {
-            Ray ray = mainCamera.ScreenPointToRay(Input.mousePosition);
-            RaycastHit hit;
+            Debug.Log("[InputManager] No ship selected for movement");
+            return;
+        }
 
-            if (Physics.Raycast(ray, out hit, Mathf.Infinity, groundLayerMask))
+        Ray ray = mainCamera.ScreenPointToRay(Input.mousePosition);
+        Debug.Log($"[InputManager] Casting ray from {ray.origin} in direction {ray.direction}");
+
+        if (Physics.Raycast(ray, out RaycastHit hit, Mathf.Infinity, groundLayerMask))
+        {
+            Debug.Log($"[InputManager] Hit point: {hit.point}");
+            
+            if (selectedShip.TryGetComponent<ShipMovement>(out var movement))
             {
-                // Get ship movement component and set target position
-                var movement = selectedShip.GetComponent<ShipMovement>();
-                if (movement != null)
-                {
-                    movement.SetTargetPosition(hit.point);
-                    Debug.Log($"[InputManager] Moving ship to position: {hit.point}");
-                }
+                Debug.Log($"[InputManager] Setting target position for {selectedShip.ShipName}");
+                movement.SetTargetPosition(hit.point);
+            }
+            else
+            {
+                Debug.LogWarning($"[InputManager] Selected ship {selectedShip.ShipName} has no ShipMovement component");
+            }
+        }
+        else
+        {
+            Debug.Log("[InputManager] Right-click raycast didn't hit anything");
+        }
+    }
+
+    private void HandleCameraDrag()
+    {
+        Vector3 deltaPosition = Input.mousePosition - lastMousePosition;
+        Vector3 cameraMovement = new Vector3(-deltaPosition.x, 0, -deltaPosition.y) * cameraDragSpeed * Time.deltaTime;
+        
+        if (mainCamera.transform.parent != null)
+        {
+            mainCamera.transform.parent.Translate(cameraMovement, Space.World);
+        }
+        else
+        {
+            mainCamera.transform.Translate(cameraMovement, Space.World);
+        }
+
+        lastMousePosition = Input.mousePosition;
+    }
+
+    private void HandleKeyboardInput()
+    {
+        // WASD movement
+        float horizontal = Input.GetAxis("Horizontal");
+        float vertical = Input.GetAxis("Vertical");
+
+        if (horizontal != 0 || vertical != 0)
+        {
+            Vector3 movement = new Vector3(horizontal, 0, vertical) * cameraMovementSpeed * Time.deltaTime;
+            
+            if (mainCamera.transform.parent != null)
+            {
+                mainCamera.transform.parent.Translate(movement, Space.World);
+            }
+            else
+            {
+                mainCamera.transform.Translate(movement, Space.World);
+            }
+        }
+
+        // Tab key for cycling through ships
+        if (Input.GetKeyDown(KeyCode.Tab))
+        {
+            Debug.Log("[InputManager] Tab pressed - cycling ships");
+            var player = FindFirstObjectByType<Player>();
+            if (player != null)
+            {
+                player.SelectNextShip();
             }
         }
     }
 
-    public Ship GetSelectedShip()
+    public void OnShipSelected(Ship ship)
     {
-        return selectedShip;
+        Debug.Log($"[InputManager] Ship selection changed to {(ship != null ? ship.ShipName : "null")}");
+        selectedShip = ship;
     }
 
     private void OnValidate()
     {
-        // Help ensure proper layer masks are set in the inspector
-        if (shipLayerMask == 0)
+        if (cameraMovementSpeed <= 0)
         {
-            Debug.LogWarning("Ship layer mask not set in InputManager. Please set it in the inspector.");
+            cameraMovementSpeed = 10f;
+            Debug.LogWarning("[InputManager] Camera movement speed must be positive - reset to default");
         }
-        if (groundLayerMask == 0)
+
+        if (cameraDragSpeed <= 0)
         {
-            Debug.LogWarning("Ground layer mask not set in InputManager. Please set it in the inspector.");
+            cameraDragSpeed = 2f;
+            Debug.LogWarning("[InputManager] Camera drag speed must be positive - reset to default");
         }
     }
 }
