@@ -11,6 +11,12 @@ public class ShipMovement : MonoBehaviour
     [Header("Movement Smoothing")]
     [SerializeField] private float rotationSmoothTime = 0.3f;
     [SerializeField] private float velocitySmoothTime = 0.3f;
+    [SerializeField] private float heightSmoothTime = 0.5f;  // Added for smooth height adjustments
+    
+    [Header("Water Interaction")]
+    [SerializeField] private float waterLevel = 0f;  // Default water level
+    [SerializeField] private float buoyancyOffset = 0.5f;  // How much of the ship sits below water
+    [SerializeField] private float waterDrag = 0.95f;  // Added water resistance
     
     private Vector3 targetPosition;
     private float currentSpeed;
@@ -21,6 +27,7 @@ public class ShipMovement : MonoBehaviour
     // Smoothing variables
     private Vector3 currentVelocity;
     private float rotationVelocity;
+    private float heightVelocity;
     
     private void Start()
     {
@@ -34,26 +41,43 @@ public class ShipMovement : MonoBehaviour
             return;
         }
         
-        targetPosition = transform.position;
+        // Initialize position at correct water level
+        Vector3 startPos = transform.position;
+        startPos.y = waterLevel + buoyancyOffset;
+        transform.position = startPos;
+        targetPosition = startPos;
+        
+        // Configure rigidbody for water movement
+        rb.drag = waterDrag;
+        rb.angularDrag = waterDrag;
+        rb.useGravity = false;  // We'll handle vertical positioning ourselves
+        
         Debug.Log($"[ShipMovement] Initialized on {gameObject.name}");
     }
     
     private void FixedUpdate()
     {
-        if (isMoving && (buoyancy == null || buoyancy.isInWater))
+        if (isMoving)
         {
             MoveTowardsTarget();
         }
+        
+        // Always maintain proper height above water
+        MaintainWaterLevel();
+    }
+    
+    private void MaintainWaterLevel()
+    {
+        float targetHeight = waterLevel + buoyancyOffset;
+        Vector3 newPosition = rb.position;
+        newPosition.y = Mathf.SmoothDamp(rb.position.y, targetHeight, ref heightVelocity, heightSmoothTime);
+        rb.MovePosition(newPosition);
     }
     
     public void SetTargetPosition(Vector3 position)
     {
-        // Keep the target at water level
-        if (buoyancy != null)
-        {
-            position.y = buoyancy.WaterLevel;
-        }
-        
+        // Ensure target is at water level
+        position.y = waterLevel + buoyancyOffset;
         targetPosition = position;
         isMoving = true;
         Debug.Log($"[ShipMovement] Set target position for {gameObject.name} to {position}");
@@ -69,11 +93,9 @@ public class ShipMovement : MonoBehaviour
         
         if (distanceToTarget < 0.1f)
         {
-            // Prevent jittering when very close to target
             return;
         }
         
-        // Normalize direction after calculating distance
         directionToTarget.Normalize();
         
         // Calculate target rotation
@@ -95,8 +117,8 @@ public class ShipMovement : MonoBehaviour
         // Calculate movement force
         Vector3 movementForce = transform.forward * currentSpeed;
         
-        // Apply force instead of direct position change
-        rb.AddForce(movementForce, ForceMode.Acceleration);
+        // Apply force with water resistance
+        rb.AddForce(movementForce * (1f - waterDrag * Time.fixedDeltaTime), ForceMode.Acceleration);
         
         // Handle stopping
         if (distanceToTarget <= stoppingDistance && currentSpeed < 0.1f)
@@ -124,5 +146,11 @@ public class ShipMovement : MonoBehaviour
         // Draw stopping distance
         Gizmos.color = Color.red;
         Gizmos.DrawWireSphere(targetPosition, stoppingDistance);
+        
+        // Draw water level
+        Gizmos.color = Color.blue;
+        Vector3 waterPos = transform.position;
+        waterPos.y = waterLevel;
+        Gizmos.DrawWireCube(waterPos, new Vector3(2f, 0.1f, 2f));
     }
 }
