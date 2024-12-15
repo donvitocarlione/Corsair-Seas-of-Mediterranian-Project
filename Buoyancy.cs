@@ -60,8 +60,8 @@ public class Buoyancy : MonoBehaviour
             return;
         }
         
-        initialDrag = rb.drag;
-        initialAngularDrag = rb.angularDrag;
+        initialDrag = rb.linearDamping;
+        initialAngularDrag = rb.angularDamping;
         
         // Set initial position slightly above water
         if (transform.position.y <= waterLevelY)
@@ -167,8 +167,8 @@ public class Buoyancy : MonoBehaviour
         }
         else
         {
-            rb.drag = initialDrag;
-            rb.angularDrag = initialAngularDrag;
+            rb.linearDamping = initialDrag;
+            rb.angularDamping = initialAngularDrag;
         }
     }
     
@@ -205,10 +205,10 @@ public class Buoyancy : MonoBehaviour
     
     void ApplyWaterResistance()
     {
-        rb.drag = waterDrag * boatSubmergedPercentage;
-        rb.angularDrag = waterAngularDrag * boatSubmergedPercentage;
+        rb.linearDamping = waterDrag * boatSubmergedPercentage;
+        rb.angularDamping = waterAngularDrag * boatSubmergedPercentage;
         
-        Vector3 localVelocity = transform.InverseTransformDirection(rb.velocity);
+        Vector3 localVelocity = transform.InverseTransformDirection(rb.linearVelocity);
         
         // Improved directional resistance
         Vector3 sideForce = -transform.right * localVelocity.x * sideResistance * boatSubmergedPercentage;

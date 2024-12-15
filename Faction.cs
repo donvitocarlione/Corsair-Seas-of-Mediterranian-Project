@@ -21,7 +21,7 @@ public class Faction : MonoBehaviour
         if (!members.Contains(pirate))
         {
             members.Add(pirate);
-            pirate.SetFaction(factionType);
+             pirate.SetFaction(factionType);
         }
     }
 

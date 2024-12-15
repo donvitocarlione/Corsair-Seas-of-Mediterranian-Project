@@ -61,7 +61,7 @@ public class InputManager : MonoBehaviour
     private void HandleRightClick()
     {
         Debug.Log("[InputManager] Processing right click");
-        
+
         if (selectedShip == null)
         {
             Debug.Log("[InputManager] No ship selected for movement");
@@ -74,7 +74,7 @@ public class InputManager : MonoBehaviour
         if (Physics.Raycast(ray, out RaycastHit hit, Mathf.Infinity, groundLayerMask))
         {
             Debug.Log($"[InputManager] Hit point: {hit.point}");
-            
+
             if (selectedShip.TryGetComponent<ShipMovement>(out var movement))
             {
                 Debug.Log($"[InputManager] Setting target position for {selectedShip.ShipName}");
@@ -89,6 +89,12 @@ public class InputManager : MonoBehaviour
         {
             Debug.Log("[InputManager] Right-click raycast didn't hit anything");
         }
+    }
+    
+    public void OnShipSelected(Ship ship)
+    {
+        Debug.Log($"[InputManager] Ship selection changed to {(ship != null ? ship.ShipName : "null")}");
+        selectedShip = ship;
     }
 
     private void HandleCameraDrag()
@@ -138,12 +144,6 @@ public class InputManager : MonoBehaviour
                 player.SelectNextShip();
             }
         }
-    }
-
-    public void OnShipSelected(Ship ship)
-    {
-        Debug.Log($"[InputManager] Ship selection changed to {(ship != null ? ship.ShipName : "null")}");
-        selectedShip = ship;
     }
 
     private void OnValidate()

@@ -16,6 +16,7 @@ public class Ship : MonoBehaviour
     private Pirate shipOwner;
 
     public string ShipName => shipName;
+   public string Name => shipName;
     public Pirate ShipOwner => shipOwner;
     public bool IsSelected => isSelected;
     public bool IsSinking => isSinking;
@@ -34,32 +35,51 @@ public class Ship : MonoBehaviour
         }
     }
 
+    public void Initialize(FactionType newFaction, string newName)
+    {
+        Debug.Log($"[Ship] Initializing {shipName} with faction {newFaction} and name {newName}");
+        SetName(newName);
+    }
+
+     public void SetName(string newName)
+    {
+        shipName = newName;
+    }
+
+
     public void SetOwner(Pirate owner)
     {
         Debug.Log($"[Ship] Setting owner for {shipName} to {(owner != null ? owner.GetType().Name : "null")}");
         shipOwner = owner;
     }
 
-    public bool Select()
+    public void ClearOwner()
     {
-        Debug.Log($"[Ship] Attempting to select {shipName}");
-        
-        if (isSinking)
+        Debug.Log($"[Ship] Clearing owner for {shipName}");
+        shipOwner = null;
+    }
+    
+
+    public bool Select()
         {
-            Debug.LogWarning($"[Ship] Cannot select {shipName} - ship is sinking");
+            Debug.Log($"[Ship] Attempting to select {shipName}");
+
+            if (isSinking)
+            {
+                Debug.LogWarning($"[Ship] Cannot select {shipName} - ship is sinking");
+                return false;
+            }
+
+            if (selectionHandler != null && selectionHandler.Select())
+            {
+                isSelected = true;
+                Debug.Log($"[Ship] Successfully selected {shipName}");
+                return true;
+            }
+
+            Debug.LogWarning($"[Ship] Failed to select {shipName}");
             return false;
         }
-
-        if (selectionHandler != null && selectionHandler.Select())
-        {
-            isSelected = true;
-            Debug.Log($"[Ship] Successfully selected {shipName}");
-            return true;
-        }
-        
-        Debug.LogWarning($"[Ship] Failed to select {shipName}");
-        return false;
-    }
 
     public void Deselect()
     {
@@ -81,11 +101,11 @@ public class Ship : MonoBehaviour
         // Check if ship should start sinking
         if (currentHealth <= 0 && !isSinking)
         {
-            StartSinking();
+           StartSinking();
         }
     }
 
-    private void StartSinking()
+   private void StartSinking()
     {
         Debug.Log($"[Ship] {shipName} starting to sink");
         isSinking = true;
@@ -101,6 +121,7 @@ public class Ship : MonoBehaviour
         {
             Debug.Log($"[Ship] Removing {shipName} from owner's fleet");
             shipOwner.RemoveShip(this);
+             ClearOwner();
         }
 
         // Disable selection handler
@@ -109,6 +130,7 @@ public class Ship : MonoBehaviour
             selectionHandler.enabled = false;
         }
     }
+
 
     public void Repair(float amount)
     {

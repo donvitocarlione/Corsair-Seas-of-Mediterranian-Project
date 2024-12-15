@@ -72,6 +72,7 @@ public class ShipMovement : MonoBehaviour
 
     public void SetTargetPosition(Vector3 position)
     {
+         Debug.Log($"[ShipMovement] Setting target position to {position}");
         targetPosition = position;
         targetPosition.y = transform.position.y;
         isMoving = true;
@@ -82,12 +83,15 @@ public class ShipMovement : MonoBehaviour
         {
             float targetAngle = Mathf.Atan2(directionToTarget.x, directionToTarget.z) * Mathf.Rad2Deg;
             targetRotation = Quaternion.Euler(0, targetAngle, 0);
-            currentState = ShipState.Turning;
+             currentState = ShipState.Turning;
+             Debug.Log($"[ShipMovement] Setting ship state to turning to {targetRotation.eulerAngles}");
         }
+        
     }
 
     public void StopMovement()
     {
+         Debug.Log($"[ShipMovement] Stopping movement");
         targetPosition = Vector3.zero;
         isMoving = false;
         currentVelocity = Vector3.zero;
@@ -97,6 +101,7 @@ public class ShipMovement : MonoBehaviour
 
     void FixedUpdate()
     {
+         Debug.Log($"[ShipMovement] FixedUpdate state is {currentState}");
         switch (currentState)
         {
             case ShipState.Moving:
@@ -116,7 +121,11 @@ public class ShipMovement : MonoBehaviour
 
     private void RotateTowardsTarget()
     {
-        if (currentSpeed < minSpeedForTurning) return;
+         Debug.Log($"[ShipMovement] Rotating to {targetRotation.eulerAngles} current {transform.rotation.eulerAngles}");
+        if (currentSpeed < minSpeedForTurning)
+        {
+            return;
+        }
         
         float currentTurnSpeed = baseTurnSpeed * turnSpeedMultiplier;
         transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, 
@@ -125,19 +134,22 @@ public class ShipMovement : MonoBehaviour
         if (Quaternion.Angle(transform.rotation, targetRotation) < 1f)
         {
             currentState = ShipState.Moving;
+             Debug.Log($"[ShipMovement] Rotation completed, ship is moving");
         }
     }
 
     private void MoveTowardsTarget()
     {
+         Debug.Log($"[ShipMovement] Moving to {targetPosition}, speed {currentSpeed}");
         if (!isMoving) return;
         
         float distanceToTarget = Vector3.Distance(transform.position, targetPosition);
         
-        if (distanceToTarget <= stoppingDistance)
+         if (distanceToTarget <= stoppingDistance)
         {
-            StopMovement();
-            return;
+           Debug.Log($"[ShipMovement] Distance is less than {stoppingDistance}, stopping ship");
+           StopMovement();
+           return;
         }
         
         // Calculate desired speed based on distance
@@ -187,6 +199,7 @@ public class ShipMovement : MonoBehaviour
     {
         if (rb.linearVelocity.magnitude < 0.01f)
         {
+             Debug.Log($"[ShipMovement] Velocity is less than 0.01, stopping");
             rb.linearVelocity = Vector3.zero;
             currentState = ShipState.Idle;
             return;

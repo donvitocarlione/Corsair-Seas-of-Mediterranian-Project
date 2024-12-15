@@ -115,7 +115,6 @@ public class FactionInitializer : MonoBehaviour
                         Debug.Log($"[FactionInitializer] Added ship {ship.ShipName} to pirate's fleet");
                     }
                 }
-
                 // Register pirate with FactionManager
                 var factionData = factionManager.GetFactionData(data.Faction);
                 if (factionData != null && !factionData.pirates.Contains(pirate))

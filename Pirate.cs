@@ -2,116 +2,27 @@ using UnityEngine;
 using System.Collections.Generic;
 using CSM.Base;
 
-[AddComponentMenu("Game/Pirate")]
-public class Pirate : SeaEntityBase, IShipOwner
+
+public class Pirate : MonoBehaviour, IShipOwner
 {
-    protected List<Ship> ownedShips;
-    [SerializeField, Range(0f, 100f), Tooltip("Pirate's reputation affects trading and diplomacy")]
-    protected float reputation = 50f;
-    [SerializeField, Min(0f), Tooltip("Current wealth in gold coins")]
-    protected float wealth = 1000f;
+    protected List<Ship> ownedShips = new List<Ship>();
+    [SerializeField]
+    private FactionType faction;
 
-    private bool isInitialized;
-    private const float MIN_REPUTATION = 0f;
-    private const float MAX_REPUTATION = 100f;
-
-    protected virtual void Awake()
+    public FactionType Faction
     {
-        ownedShips = new List<Ship>();
+        get => faction;
+        protected set => faction = value;
     }
-    
-    protected override void Start()
+
+    public virtual void SetFaction(FactionType newFaction)
     {
-        base.Start();
-        // Only register if not the player (player will be registered by ShipManager)
-        if (!(this is Player))
+        if (!object.Equals(newFaction, Faction))
         {
-            RegisterWithFaction();
+            this.Faction = newFaction;
         }
     }
 
-    protected override void OnDestroy()
-    {
-        base.OnDestroy();
-        if (isInitialized)
-        {
-            UnregisterFromFaction();
-        }
-
-        // Clean up ships
-        if (ownedShips != null)
-        {
-            foreach (var ship in ownedShips.ToArray())
-            {
-                if (ship != null)
-                {
-                    RemoveShip(ship);
-                }
-            }
-            ownedShips.Clear();
-        }
-    }
-
-    public void ModifyReputation(float amount)
-    {
-        reputation = Mathf.Clamp(reputation + amount, MIN_REPUTATION, MAX_REPUTATION);
-    }
-
-    public void ModifyWealth(float amount)
-    {
-        wealth = Mathf.Max(0f, wealth + amount);
-    }
-
-    public override void SetFaction(FactionType newFaction)
-    {
-        if (!isInitialized || !object.Equals(newFaction, Faction))
-        {
-            if (isInitialized)
-            {
-                UnregisterFromFaction();
-            }
-            
-            base.SetFaction(newFaction);
-            RegisterWithFaction();
-            isInitialized = true;
-            HandleFactionChanged(newFaction);
-        }
-    }
-
-    private void RegisterWithFaction()
-    {
-        if (FactionManager.Instance == null)
-        {
-            Debug.LogError("FactionManager instance not found!");
-            return;
-        }
-
-        var factionData = FactionManager.Instance.GetFactionData(Faction);
-        if (factionData == null)
-        {
-            Debug.LogError($"No faction data found for faction {Faction}");
-            return;
-        }
-
-        if (!factionData.pirates.Contains(this))
-        {
-            factionData.pirates.Add(this);
-            Debug.Log($"Registered pirate with faction {Faction}");
-        }
-    }
-
-    private void UnregisterFromFaction()
-    {
-        if (FactionManager.Instance == null) return;
-
-        var factionData = FactionManager.Instance.GetFactionData(Faction);
-        if (factionData != null && factionData.pirates.Contains(this))
-        {
-            factionData.pirates.Remove(this);
-            Debug.Log($"Unregistered pirate from faction {Faction}");
-        }
-    }
-    
     public virtual void AddShip(Ship ship)
     {
         if (ship == null)
@@ -125,6 +36,12 @@ public class Pirate : SeaEntityBase, IShipOwner
             ownedShips.Add(ship);
             ship.SetOwner(this);
             ship.Initialize(Faction, ship.ShipName);
+
+             if (!(this is Player) && ship.GetComponent<AIShipController>() == null)
+            {
+                ship.gameObject.AddComponent<AIShipController>().Initialize(ship);
+                Debug.Log($"Added AI controller to {ship.ShipName} in pirate {GetType().Name} fleet");
+            }
             Debug.Log($"Added ship {ship.ShipName} to {GetType().Name}'s fleet");
         }
     }
@@ -144,13 +61,18 @@ public class Pirate : SeaEntityBase, IShipOwner
             {
                 ship.ClearOwner();
             }
+            if (!(this is Player) && ship.TryGetComponent<AIShipController>(out var aiController))
+            {
+                Destroy(aiController);
+                Debug.Log($"Removed AI controller from ship {ship.ShipName} in {GetType().Name} fleet");
+            }
             Debug.Log($"Removed ship {ship.ShipName} from {GetType().Name}'s fleet");
         }
     }
 
     public virtual void SelectShip(Ship ship)
     {
-        if (ship == null)
+         if (ship == null)
         {
             Debug.LogError("Attempting to select a null ship!");
             return;
@@ -165,27 +87,12 @@ public class Pirate : SeaEntityBase, IShipOwner
                     ownedShip.Deselect();
                 }
             }
-            ship.Select();
+             ship.Select();
         }
     }
 
     public List<Ship> GetOwnedShips()
     {
         return new List<Ship>(ownedShips);
-    }
-
-    protected virtual void HandleFactionChanged(FactionType newFaction)
-    {
-        Debug.Log($"{GetType().Name}'s faction changed to {newFaction}");
-
-        if (ownedShips == null) return;
-        
-        foreach (var ship in ownedShips.ToArray())
-        {
-            if (ship != null)
-            {
-                ship.Initialize(newFaction, ship.ShipName);
-            }
-        }
     }
 }

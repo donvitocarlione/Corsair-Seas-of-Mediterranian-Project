@@ -86,6 +86,7 @@ public class ShipSpawner : MonoBehaviour
         return null;
     }
 
+
     public Pirate SpawnPirateShip(FactionType faction)
     {
         var pirateObj = Instantiate(piratePrefab, Vector3.zero, Quaternion.identity, piratesParent);

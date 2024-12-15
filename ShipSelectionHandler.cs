@@ -54,12 +54,22 @@ public class ShipSelectionHandler : MonoBehaviour
 
     private void StoreOriginalMaterials()
     {
+         if (targetRenderers == null)
+        {
+            Debug.LogError("[ShipSelectionHandler] targetRenderers array is null when storing materials.");
+             return;
+        }
+        
         originalMaterials = new Material[targetRenderers.Length];
         for (int i = 0; i < targetRenderers.Length; i++)
         {
             if (targetRenderers[i] != null)
             {
                 originalMaterials[i] = targetRenderers[i].material;
+                 Debug.Log($"[ShipSelectionHandler] Stored original material for {targetRenderers[i].name}");
+            }else
+            {
+                Debug.LogWarning($"[ShipSelectionHandler] Target renderer at index {i} is null.");
             }
         }
     }
@@ -103,7 +113,7 @@ public class ShipSelectionHandler : MonoBehaviour
 
         if (shipReference.ShipOwner == null)
         {
-            Debug.LogError($"[ShipSelectionHandler] Cannot select - ship has no owner on {gameObject.name}");
+             Debug.LogError($"[ShipSelectionHandler] Cannot select - ship has no owner on {gameObject.name}");
             return false;
         }
 
@@ -118,25 +128,45 @@ public class ShipSelectionHandler : MonoBehaviour
 
     private void ApplySelectedMaterial()
     {
-        if (selectedMaterial != null)
+        if (selectedMaterial == null)
         {
-            foreach (var renderer in targetRenderers)
+             Debug.LogError($"[ShipSelectionHandler] Selected material is null on {gameObject.name}");
+            return;
+        }
+
+        if (targetRenderers == null)
+        {
+            Debug.LogError($"[ShipSelectionHandler] targetRenderers array is null when applying material on {gameObject.name}");
+            return;
+        }
+
+        foreach (var renderer in targetRenderers)
+        {
+            if (renderer != null)
             {
-                if (renderer != null)
-                {
-                    renderer.material = selectedMaterial;
-                }
+                renderer.material = selectedMaterial;
+                 Debug.Log($"[ShipSelectionHandler] Applied selected material to {renderer.name}");
+            }else
+            {
+                  Debug.LogWarning($"[ShipSelectionHandler] Target renderer in {gameObject.name} is null when applying material.");
             }
         }
     }
 
     private void RestoreOriginalMaterials()
     {
+        if (targetRenderers == null)
+        {
+             Debug.LogError($"[ShipSelectionHandler] targetRenderers array is null when restoring material on {gameObject.name}");
+            return;
+        }
+
         for (int i = 0; i < targetRenderers.Length; i++)
         {
             if (targetRenderers[i] != null && originalMaterials[i] != null)
             {
                 targetRenderers[i].material = originalMaterials[i];
+                Debug.Log($"[ShipSelectionHandler] Restored original material to {targetRenderers[i].name}");
             }
         }
     }
@@ -146,6 +176,7 @@ public class ShipSelectionHandler : MonoBehaviour
         if (selectionIndicator != null)
         {
             selectionIndicator.SetActive(show);
+             Debug.Log($"[ShipSelectionHandler] Selection indicator set to {show} on {gameObject.name}");
         }
     }
 
@@ -161,6 +192,7 @@ public class ShipSelectionHandler : MonoBehaviour
             if (CanBeSelected() && shipReference.ShipOwner is Player player)
             {
                 player.SelectShip(shipReference);
+                 SelectionManager.Instance.ShowSelectionAt(transform);
             }
         }
     }
