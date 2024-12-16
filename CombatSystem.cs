@@ -168,13 +168,43 @@ public class CombatSystem : MonoBehaviour
         }
 
         float distance = Vector3.Distance(attacker.transform.position, target.transform.position);
+        
+        // Check if target is beyond max combat range
+        if (distance > maxCombatRange)
+        {
+            LogSystem($"{attacker.ShipName} disengaging - Target beyond max combat range ({distance:F1} units)");
+            return false;
+        }
+
+        // Check if target is beyond disengage distance
         if (distance > minDisengageDistance)
         {
-            LogSystem($"{attacker.ShipName} disengaging - Target out of range ({distance:F1} units)");
+            LogSystem($"{attacker.ShipName} disengaging - Target beyond disengage distance ({distance:F1} units)");
             return false;
         }
 
         return true;
+    }
+
+    public void ClearCombatTarget(Ship ship)
+    {
+        if (ship != null)
+        {
+            if (combatTargets.TryGetValue(ship, out Ship target))
+            {
+                LogSystem($"Combat target cleared: {ship.ShipName} no longer targeting {target?.ShipName}");
+            }
+            
+            combatTargets.Remove(ship);
+            lastRangeCheckTime.Remove(ship);
+
+            // Reset ship movement if applicable
+            var movement = ship.GetComponent<ShipMovement>();
+            if (movement != null)
+            {
+                movement.ClearTargetPosition();
+            }
+        }
     }
 
     private void ProcessCombatAction(Ship attacker, Ship target)
@@ -228,13 +258,7 @@ public class CombatSystem : MonoBehaviour
 
     private void DisengageCombat(Ship ship)
     {
-        if (combatTargets.TryGetValue(ship, out Ship target))
-        {
-            LogSystem($"Combat disengaged: {ship.ShipName} vs {target?.ShipName}");
-        }
-        
-        combatTargets.Remove(ship);
-        lastRangeCheckTime.Remove(ship);
+        ClearCombatTarget(ship);
     }
 
     private bool ShouldUpdateCombatCheck(Ship ship)
@@ -296,6 +320,10 @@ public class CombatSystem : MonoBehaviour
         // Attack range
         Gizmos.color = new Color(1, 0, 0, 0.2f);
         Gizmos.DrawWireSphere(attacker.transform.position, attacker.AttackRange);
+
+        // Maximum combat range
+        Gizmos.color = new Color(1, 0.5f, 0, 0.1f);
+        Gizmos.DrawWireSphere(attacker.transform.position, maxCombatRange);
 
         // Firing arc
         DrawFiringArc(attacker);
