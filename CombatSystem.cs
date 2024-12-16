@@ -4,30 +4,20 @@ using System.Collections.Generic;
 public class CombatSystem : MonoBehaviour
 {
     private static CombatSystem instance;
-    public static CombatSystem Instance
-    {
-        get
-        {
-            if (instance == null)
-            {
-                instance = FindObjectOfType<CombatSystem>();
-                if (instance == null)
-                {
-                    GameObject obj = new GameObject("CombatSystem");
-                    instance = obj.AddComponent<CombatSystem>();
-                }
-            }
-            return instance;
-        }
-    }
+    public static CombatSystem Instance => instance;
 
     [Header("Debug Settings")]
-    [SerializeField] private bool ignoreFactionChecks = true; // Added for testing
-    [SerializeField] private bool debugMode = true;
+    [SerializeField] private bool showDebugGizmos = true;
+    [SerializeField] private bool ignoreFactionChecks = false;
+    [SerializeField] private bool logCombatDetails = true;
+    
+    [Header("Combat Parameters")]
+    [SerializeField] private float combatUpdateInterval = 0.5f;
+    [SerializeField] private float maxCombatRange = 200f;
+    [SerializeField] private float minDisengageDistance = 250f;
 
     private Dictionary<Ship, Ship> combatTargets = new Dictionary<Ship, Ship>();
     private Dictionary<Ship, float> lastRangeCheckTime = new Dictionary<Ship, float>();
-    private const float RANGE_CHECK_INTERVAL = 0.5f;
 
     private void Awake()
     {
@@ -36,21 +26,105 @@ public class CombatSystem : MonoBehaviour
             Destroy(gameObject);
             return;
         }
-
         instance = this;
         DontDestroyOnLoad(gameObject);
+        
+        LogSystem("CombatSystem initialized");
     }
 
     private void Start()
     {
-        // Force factions to be at war for testing
-        if (ignoreFactionChecks && FactionManager.Instance != null)
+        ValidateFactionsSetup();
+    }
+
+    private void ValidateFactionsSetup()
+    {
+        if (FactionManager.Instance == null)
         {
-            FactionManager.Instance.UpdateFactionRelation(FactionType.Pirates, FactionType.Merchants, 0);
-            FactionManager.Instance.UpdateFactionRelation(FactionType.Pirates, FactionType.RoyalNavy, 0);
-            FactionManager.Instance.UpdateFactionRelation(FactionType.Pirates, FactionType.Ottomans, 0);
-            FactionManager.Instance.UpdateFactionRelation(FactionType.Pirates, FactionType.Venetians, 0);
+            LogError("FactionManager not found in scene!");
+            return;
         }
+
+        var factions = System.Enum.GetValues(typeof(FactionType));
+        LogSystem("Checking faction relations:");
+        foreach (FactionType faction1 in factions)
+        {
+            foreach (FactionType faction2 in factions)
+            {
+                if (faction1 != faction2)
+                {
+                    float relation = FactionManager.Instance.GetRelationBetweenFactions(faction1, faction2);
+                    LogSystem($"{faction1} vs {faction2}: Relation = {relation}, At War = {FactionManager.Instance.AreFactionsAtWar(faction1, faction2)}");
+                }
+            }
+        }
+    }
+
+    public void SetCombatTarget(Ship attacker, Ship target)
+    {
+        if (!ValidateCombatParticipants(attacker, target)) return;
+        
+        if (ValidateFactionRelations(attacker, target))
+        {
+            InitiateCombat(attacker, target);
+        }
+    }
+
+    private bool ValidateCombatParticipants(Ship attacker, Ship target)
+    {
+        if (attacker == null || target == null)
+        {
+            LogError("Invalid combat participants: Null attacker or target");
+            return false;
+        }
+
+        if (target.IsSinking)
+        {
+            LogWarning($"Cannot target sinking ship: {target.ShipName}");
+            return false;
+        }
+
+        if (attacker == target)
+        {
+            LogWarning("Ship cannot target itself");
+            return false;
+        }
+
+        return true;
+    }
+
+    private bool ValidateFactionRelations(Ship attacker, Ship target)
+    {
+        if (ignoreFactionChecks) return true;
+
+        var attackerFaction = attacker.ShipOwner?.Faction ?? FactionType.None;
+        var targetFaction = target.ShipOwner?.Faction ?? FactionType.None;
+
+        if (attackerFaction == targetFaction)
+        {
+            LogWarning($"Friendly fire prevented: {attackerFaction}");
+            return false;
+        }
+
+        bool atWar = FactionManager.Instance?.AreFactionsAtWar(attackerFaction, targetFaction) ?? false;
+        LogSystem($"Faction check: {attackerFaction} vs {targetFaction}, At War: {atWar}");
+        return atWar || ignoreFactionChecks;
+    }
+
+    private void InitiateCombat(Ship attacker, Ship target)
+    {
+        combatTargets[attacker] = target;
+        lastRangeCheckTime[attacker] = 0f;
+        
+        // Notify ship movement system
+        var movement = attacker.GetComponent<ShipMovement>();
+        if (movement != null)
+        {
+            movement.SetTargetPosition(target.transform.position);
+            LogSystem($"{attacker.ShipName} pursuing {target.ShipName}");
+        }
+        
+        LogSystem($"Combat initiated: {attacker.ShipName} targeting {target.ShipName}");
     }
 
     private void Update()
@@ -58,139 +132,114 @@ public class CombatSystem : MonoBehaviour
         UpdateCombatStates();
     }
 
-    public void SetCombatTarget(Ship attacker, Ship target)
-    {
-        if (attacker == null || target == null)
-        {
-            Debug.LogWarning("[CombatSystem] Attempted to set null attacker or target");
-            return;
-        }
-
-        if (target.IsSinking)
-        {
-            Debug.Log($"[CombatSystem] Cannot target sinking ship {target.ShipName}");
-            return;
-        }
-
-        if (attacker == target)
-        {
-            Debug.LogWarning("[CombatSystem] Ship cannot target itself");
-            return;
-        }
-
-        // Check faction relationships
-        if (!ignoreFactionChecks && attacker.ShipOwner != null && target.ShipOwner != null)
-        {
-            var attackerFaction = attacker.ShipOwner.Faction;
-            var targetFaction = target.ShipOwner.Faction;
-
-            if (debugMode)
-            {
-                Debug.Log($"[CombatSystem] Checking factions: {attackerFaction} vs {targetFaction}");
-                if (FactionManager.Instance != null)
-                {
-                    float relation = FactionManager.Instance.GetRelationBetweenFactions(attackerFaction, targetFaction);
-                    Debug.Log($"[CombatSystem] Faction relation: {relation}");
-                    Debug.Log($"[CombatSystem] Are factions at war: {FactionManager.Instance.AreFactionsAtWar(attackerFaction, targetFaction)}");
-                }
-            }
-
-            if (attackerFaction == targetFaction)
-            {
-                Debug.Log("[CombatSystem] Cannot target ships in the same faction");
-                return;
-            }
-
-            if (FactionManager.Instance != null && !FactionManager.Instance.AreFactionsAtWar(attackerFaction, targetFaction))
-            {
-                Debug.Log($"[CombatSystem] Factions {attackerFaction} and {targetFaction} are not at war");
-                if (!ignoreFactionChecks) return;
-            }
-        }
-
-        combatTargets[attacker] = target;
-        lastRangeCheckTime[attacker] = 0f;
-        Debug.Log($"[CombatSystem] {attacker.ShipName} targeting {target.ShipName}");
-    }
-
-    public void ClearCombatTarget(Ship attacker)
-    {
-        if (attacker != null && combatTargets.ContainsKey(attacker))
-        {
-            combatTargets.Remove(attacker);
-            lastRangeCheckTime.Remove(attacker);
-            Debug.Log($"[CombatSystem] Cleared combat target for {attacker.ShipName}");
-        }
-    }
-
-    public Ship GetCurrentTarget(Ship attacker)
-    {
-        return combatTargets.TryGetValue(attacker, out Ship target) ? target : null;
-    }
-
     private void UpdateCombatStates()
     {
-        List<Ship> shipsToRemove = new List<Ship>();
+        var shipsToRemove = new List<Ship>();
 
         foreach (var kvp in combatTargets)
         {
             Ship attacker = kvp.Key;
             Ship target = kvp.Value;
 
-            if (attacker == null || target == null || attacker.IsSinking || target.IsSinking)
+            if (!ValidateContinuedCombat(attacker, target))
             {
                 shipsToRemove.Add(attacker);
                 continue;
             }
 
-            if (Time.time - lastRangeCheckTime.GetValueOrDefault(attacker, 0f) >= RANGE_CHECK_INTERVAL)
+            if (ShouldUpdateCombatCheck(attacker))
             {
-                CheckRangeAndFire(attacker, target);
-                lastRangeCheckTime[attacker] = Time.time;
+                ProcessCombatAction(attacker, target);
             }
         }
 
         foreach (var ship in shipsToRemove)
         {
-            ClearCombatTarget(ship);
+            DisengageCombat(ship);
         }
     }
 
-    private void CheckRangeAndFire(Ship attacker, Ship target)
+    private bool ValidateContinuedCombat(Ship attacker, Ship target)
     {
-        float distanceToTarget = Vector3.Distance(attacker.transform.position, target.transform.position);
-
-        if (debugMode)
+        if (attacker == null || target == null || attacker.IsSinking || target.IsSinking)
         {
-            Debug.Log($"[CombatSystem] Distance to target: {distanceToTarget}, Attack Range: {attacker.AttackRange}");
+            LogSystem($"Combat invalidated: Ship is null or sinking");
+            return false;
         }
 
-        if (distanceToTarget <= attacker.AttackRange)
+        float distance = Vector3.Distance(attacker.transform.position, target.transform.position);
+        if (distance > minDisengageDistance)
+        {
+            LogSystem($"{attacker.ShipName} disengaging - Target out of range ({distance:F1} units)");
+            return false;
+        }
+
+        return true;
+    }
+
+    private void ProcessCombatAction(Ship attacker, Ship target)
+    {
+        float distance = Vector3.Distance(attacker.transform.position, target.transform.position);
+        
+        if (distance <= attacker.AttackRange)
         {
             Vector3 directionToTarget = (target.transform.position - attacker.transform.position).normalized;
             float angleToTarget = Vector3.Angle(attacker.transform.forward, directionToTarget);
 
-            if (debugMode)
-            {
-                Debug.Log($"[CombatSystem] Angle to target: {angleToTarget}, Firing Arc: {attacker.FiringArc}");
-            }
-
             if (angleToTarget <= attacker.FiringArc * 0.5f)
             {
-                if (attacker.CanFire)
-                {
-                    attacker.Fire(target);
-                }
-                else if (debugMode)
-                {
-                    Debug.Log($"[CombatSystem] {attacker.ShipName} cannot fire (reload/ammo)");
-                }
+                AttemptToFire(attacker, target, angleToTarget);
             }
             else
             {
-                Debug.Log($"[CombatSystem] {attacker.ShipName} target not in firing arc (angle: {angleToTarget})");
+                LogCombat($"{attacker.ShipName} cannot fire: Target outside firing arc ({angleToTarget:F1}°)");
             }
         }
+        else
+        {
+            LogCombat($"{attacker.ShipName} pursuing target: Distance {distance:F1} units");
+            UpdatePursuit(attacker, target);
+        }
+
+        lastRangeCheckTime[attacker] = Time.time;
+    }
+
+    private void AttemptToFire(Ship attacker, Ship target, float angleToTarget)
+    {
+        if (attacker.CanFire)
+        {
+            LogCombat($"{attacker.ShipName} firing at {target.ShipName} (Angle: {angleToTarget:F1}°)");
+            attacker.Fire(target);
+        }
+        else
+        {
+            LogCombat($"{attacker.ShipName} cannot fire: {(attacker.CurrentAmmo <= 0 ? "No ammo" : "Reloading")}");
+        }
+    }
+
+    private void UpdatePursuit(Ship attacker, Ship target)
+    {
+        var movement = attacker.GetComponent<ShipMovement>();
+        if (movement != null)
+        {
+            movement.SetTargetPosition(target.transform.position);
+        }
+    }
+
+    private void DisengageCombat(Ship ship)
+    {
+        if (combatTargets.TryGetValue(ship, out Ship target))
+        {
+            LogSystem($"Combat disengaged: {ship.ShipName} vs {target?.ShipName}");
+        }
+        
+        combatTargets.Remove(ship);
+        lastRangeCheckTime.Remove(ship);
+    }
+
+    private bool ShouldUpdateCombatCheck(Ship ship)
+    {
+        return Time.time - lastRangeCheckTime.GetValueOrDefault(ship, 0f) >= combatUpdateInterval;
     }
 
     public bool IsInCombat(Ship ship)
@@ -198,29 +247,62 @@ public class CombatSystem : MonoBehaviour
         return combatTargets.ContainsKey(ship) || combatTargets.ContainsValue(ship);
     }
 
+    #region Debug Methods
+    private void LogSystem(string message)
+    {
+        if (logCombatDetails)
+        {
+            Debug.Log($"[CombatSystem] {message}");
+        }
+    }
+
+    private void LogCombat(string message)
+    {
+        if (logCombatDetails)
+        {
+            Debug.Log($"[Combat] {message}");
+        }
+    }
+
+    private void LogWarning(string message)
+    {
+        Debug.LogWarning($"[CombatSystem] {message}");
+    }
+
+    private void LogError(string message)
+    {
+        Debug.LogError($"[CombatSystem] {message}");
+    }
+
     private void OnDrawGizmos()
     {
-        if (!Application.isPlaying) return;
+        if (!Application.isPlaying || !showDebugGizmos) return;
 
         foreach (var kvp in combatTargets)
         {
             if (kvp.Key != null && kvp.Value != null)
             {
-                Gizmos.color = Color.red;
-                Gizmos.DrawLine(kvp.Key.transform.position, kvp.Value.transform.position);
-
-                Gizmos.color = new Color(1, 0, 0, 0.2f);
-                Gizmos.DrawWireSphere(kvp.Key.transform.position, kvp.Key.AttackRange);
-
-                DrawFiringArc(kvp.Key);
+                DrawCombatGizmos(kvp.Key, kvp.Value);
             }
         }
     }
 
+    private void DrawCombatGizmos(Ship attacker, Ship target)
+    {
+        // Combat connection line
+        Gizmos.color = Color.red;
+        Gizmos.DrawLine(attacker.transform.position, target.transform.position);
+
+        // Attack range
+        Gizmos.color = new Color(1, 0, 0, 0.2f);
+        Gizmos.DrawWireSphere(attacker.transform.position, attacker.AttackRange);
+
+        // Firing arc
+        DrawFiringArc(attacker);
+    }
+
     private void DrawFiringArc(Ship ship)
     {
-        if (ship == null) return;
-
         Gizmos.color = new Color(1, 1, 0, 0.2f);
         Vector3 forward = ship.transform.forward;
         float radius = ship.AttackRange;
@@ -239,4 +321,5 @@ public class CombatSystem : MonoBehaviour
             Gizmos.DrawLine(point2, point3);
         }
     }
+    #endregion
 }
