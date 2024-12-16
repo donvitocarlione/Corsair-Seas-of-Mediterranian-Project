@@ -214,7 +214,8 @@ public class Buoyancy : MonoBehaviour
         
         rb.AddRelativeForce(dragForce * rb.mass, ForceMode.Force);
         
-        Vector3 angularDragForce = -rb.angularVelocity * turningResistance * submersionFactor;
+        // Use waterAngularDrag to affect rotation resistance
+        Vector3 angularDragForce = -rb.angularVelocity * turningResistance * waterAngularDrag * submersionFactor;
         rb.AddTorque(angularDragForce * rb.mass, ForceMode.Force);
     }
     
