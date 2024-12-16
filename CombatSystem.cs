@@ -21,6 +21,10 @@ public class CombatSystem : MonoBehaviour
         }
     }
 
+    [Header("Debug Settings")]
+    [SerializeField] private bool ignoreFactionChecks = true; // Added for testing
+    [SerializeField] private bool debugMode = true;
+
     private Dictionary<Ship, Ship> combatTargets = new Dictionary<Ship, Ship>();
     private Dictionary<Ship, float> lastRangeCheckTime = new Dictionary<Ship, float>();
     private const float RANGE_CHECK_INTERVAL = 0.5f;
@@ -37,6 +41,18 @@ public class CombatSystem : MonoBehaviour
         DontDestroyOnLoad(gameObject);
     }
 
+    private void Start()
+    {
+        // Force factions to be at war for testing
+        if (ignoreFactionChecks && FactionManager.Instance != null)
+        {
+            FactionManager.Instance.UpdateFactionRelation(FactionType.Pirates, FactionType.Merchants, 0);
+            FactionManager.Instance.UpdateFactionRelation(FactionType.Pirates, FactionType.RoyalNavy, 0);
+            FactionManager.Instance.UpdateFactionRelation(FactionType.Pirates, FactionType.Ottomans, 0);
+            FactionManager.Instance.UpdateFactionRelation(FactionType.Pirates, FactionType.Venetians, 0);
+        }
+    }
+
     private void Update()
     {
         UpdateCombatStates();
@@ -50,30 +66,50 @@ public class CombatSystem : MonoBehaviour
             return;
         }
 
-        // Don't allow targeting of sinking ships
         if (target.IsSinking)
         {
             Debug.Log($"[CombatSystem] Cannot target sinking ship {target.ShipName}");
             return;
         }
 
-        // Don't allow ships to target themselves
         if (attacker == target)
         {
             Debug.LogWarning("[CombatSystem] Ship cannot target itself");
             return;
         }
 
-        // Check if ships are in the same faction
-        if (attacker.ShipOwner != null && target.ShipOwner != null && 
-            attacker.ShipOwner.Faction == target.ShipOwner.Faction)
+        // Check faction relationships
+        if (!ignoreFactionChecks && attacker.ShipOwner != null && target.ShipOwner != null)
         {
-            Debug.Log("[CombatSystem] Cannot target ships in the same faction");
-            return;
+            var attackerFaction = attacker.ShipOwner.Faction;
+            var targetFaction = target.ShipOwner.Faction;
+
+            if (debugMode)
+            {
+                Debug.Log($"[CombatSystem] Checking factions: {attackerFaction} vs {targetFaction}");
+                if (FactionManager.Instance != null)
+                {
+                    float relation = FactionManager.Instance.GetRelationBetweenFactions(attackerFaction, targetFaction);
+                    Debug.Log($"[CombatSystem] Faction relation: {relation}");
+                    Debug.Log($"[CombatSystem] Are factions at war: {FactionManager.Instance.AreFactionsAtWar(attackerFaction, targetFaction)}");
+                }
+            }
+
+            if (attackerFaction == targetFaction)
+            {
+                Debug.Log("[CombatSystem] Cannot target ships in the same faction");
+                return;
+            }
+
+            if (FactionManager.Instance != null && !FactionManager.Instance.AreFactionsAtWar(attackerFaction, targetFaction))
+            {
+                Debug.Log($"[CombatSystem] Factions {attackerFaction} and {targetFaction} are not at war");
+                if (!ignoreFactionChecks) return;
+            }
         }
 
         combatTargets[attacker] = target;
-        lastRangeCheckTime[attacker] = 0f; // Force immediate range check
+        lastRangeCheckTime[attacker] = 0f;
         Debug.Log($"[CombatSystem] {attacker.ShipName} targeting {target.ShipName}");
     }
 
@@ -101,14 +137,12 @@ public class CombatSystem : MonoBehaviour
             Ship attacker = kvp.Key;
             Ship target = kvp.Value;
 
-            // Remove invalid targets
             if (attacker == null || target == null || attacker.IsSinking || target.IsSinking)
             {
                 shipsToRemove.Add(attacker);
                 continue;
             }
 
-            // Check if it's time to update this ship's range check
             if (Time.time - lastRangeCheckTime.GetValueOrDefault(attacker, 0f) >= RANGE_CHECK_INTERVAL)
             {
                 CheckRangeAndFire(attacker, target);
@@ -116,7 +150,6 @@ public class CombatSystem : MonoBehaviour
             }
         }
 
-        // Clean up invalid entries
         foreach (var ship in shipsToRemove)
         {
             ClearCombatTarget(ship);
@@ -127,17 +160,30 @@ public class CombatSystem : MonoBehaviour
     {
         float distanceToTarget = Vector3.Distance(attacker.transform.position, target.transform.position);
 
+        if (debugMode)
+        {
+            Debug.Log($"[CombatSystem] Distance to target: {distanceToTarget}, Attack Range: {attacker.AttackRange}");
+        }
+
         if (distanceToTarget <= attacker.AttackRange)
         {
-            // Check if target is within firing arc
             Vector3 directionToTarget = (target.transform.position - attacker.transform.position).normalized;
             float angleToTarget = Vector3.Angle(attacker.transform.forward, directionToTarget);
+
+            if (debugMode)
+            {
+                Debug.Log($"[CombatSystem] Angle to target: {angleToTarget}, Firing Arc: {attacker.FiringArc}");
+            }
 
             if (angleToTarget <= attacker.FiringArc * 0.5f)
             {
                 if (attacker.CanFire)
                 {
                     attacker.Fire(target);
+                }
+                else if (debugMode)
+                {
+                    Debug.Log($"[CombatSystem] {attacker.ShipName} cannot fire (reload/ammo)");
                 }
             }
             else
@@ -160,15 +206,12 @@ public class CombatSystem : MonoBehaviour
         {
             if (kvp.Key != null && kvp.Value != null)
             {
-                // Draw line between ships in combat
                 Gizmos.color = Color.red;
                 Gizmos.DrawLine(kvp.Key.transform.position, kvp.Value.transform.position);
 
-                // Draw attack range
                 Gizmos.color = new Color(1, 0, 0, 0.2f);
                 Gizmos.DrawWireSphere(kvp.Key.transform.position, kvp.Key.AttackRange);
 
-                // Draw firing arc
                 DrawFiringArc(kvp.Key);
             }
         }
