@@ -4,8 +4,6 @@ public class ShipMovement : MonoBehaviour
 {
     [Header("Movement Settings")]
     [SerializeField] private float maxSpeed = 10f;
-    [SerializeField] private float acceleration = 5f;
-    [SerializeField] private float rotationSpeed = 2f;
     [SerializeField] private float stoppingDistance = 1f;
     
     [Header("Movement Smoothing")]
@@ -78,7 +76,7 @@ public class ShipMovement : MonoBehaviour
         }
         else
         {
-            rb.velocity = Vector3.Lerp(rb.velocity, Vector3.zero, Time.fixedDeltaTime * 5f);
+            rb.linearVelocity = Vector3.Lerp(rb.linearVelocity, Vector3.zero, Time.fixedDeltaTime * 5f);
             rb.angularVelocity = Vector3.Lerp(rb.angularVelocity, Vector3.zero, Time.fixedDeltaTime * 5f);
         }
         
@@ -99,7 +97,7 @@ public class ShipMovement : MonoBehaviour
         targetPosition = position;
         targetShip = null;
         isMoving = true;
-        currentSpeed = rb.velocity.magnitude;
+        currentSpeed = rb.linearVelocity.magnitude;
         Debug.Log($"[ShipMovement] Set target position for {gameObject.name} to {position}");
     }
 
@@ -109,7 +107,7 @@ public class ShipMovement : MonoBehaviour
         targetPosition = position;
         targetShip = target;
         isMoving = true;
-        currentSpeed = rb.velocity.magnitude;
+        currentSpeed = rb.linearVelocity.magnitude;
         Debug.Log($"[ShipMovement] Set combat target for {gameObject.name} to {target.ShipName}");
 
         // Set combat target in the combat system
@@ -193,7 +191,7 @@ public class ShipMovement : MonoBehaviour
 
         if (distanceToTarget <= currentStoppingDistance)
         {
-            if (rb.velocity.magnitude < stoppingThreshold)
+            if (rb.linearVelocity.magnitude < stoppingThreshold)
             {
                 StopShip();
                 return;
@@ -245,7 +243,7 @@ public class ShipMovement : MonoBehaviour
         currentVelocity = Vector3.zero;
         rotationVelocity = 0f;
         
-        rb.velocity = Vector3.zero;
+        rb.linearVelocity = Vector3.zero;
         rb.angularVelocity = Vector3.zero;
         
         Debug.Log($"[ShipMovement] {gameObject.name} reached target and stopped");
