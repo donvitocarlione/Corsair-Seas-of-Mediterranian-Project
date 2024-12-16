@@ -24,7 +24,6 @@ public class FiringSystem : MonoBehaviour
     [SerializeField] private GameObject projectilePrefab;
     [SerializeField] private float projectileSpeed = 20f;
     [SerializeField] private float projectileLifetime = 3f;
-    [SerializeField] private float projectileSpawnOffset = 2f; // Distance in front of ship to spawn projectile
 
     [Header("Debug Settings")]
     [SerializeField] private bool showDebugGizmos = true;
@@ -49,42 +48,55 @@ public class FiringSystem : MonoBehaviour
             return;
         }
 
-        // Calculate spawn position in front of the ship
-        Vector3 spawnPosition = attacker.transform.position + 
-                              (attacker.transform.forward * projectileSpawnOffset) + 
-                              Vector3.up; // Slight upward offset
-
-        // Calculate direction to target with some lead for moving targets
-        Vector3 targetPosition = target.transform.position;
-        if (target.GetComponent<Rigidbody>() != null)
+        Transform[] firingPoints = attacker.GetFiringPoints();
+        if (firingPoints == null || firingPoints.Length == 0)
         {
-            // Add basic prediction
-            targetPosition += target.GetComponent<Rigidbody>().velocity * (projectileLifetime * 0.5f);
+            Debug.LogError($"[FiringSystem] No firing points found on {attacker.ShipName}!");
+            return;
         }
 
-        Vector3 fireDirection = (targetPosition - spawnPosition).normalized;
-
-        // Create the projectile
-        GameObject projectileObj = Instantiate(
-            projectilePrefab,
-            spawnPosition,
-            Quaternion.LookRotation(fireDirection)
-        );
-
-        Projectile projectile = projectileObj.GetComponent<Projectile>();
-        if (projectile != null)
+        foreach (Transform firingPoint in firingPoints)
         {
-            projectile.Initialize(attacker, target, projectileSpeed, attacker.AttackDamage, projectileLifetime);
-            Debug.Log($"[FiringSystem] {attacker.ShipName} fired projectile at {target.ShipName}");
-        }
-        else
-        {
-            Debug.LogError("[FiringSystem] Projectile prefab missing Projectile component!");
-            Destroy(projectileObj);
+            // Calculate direction to target with some lead for moving targets
+            Vector3 targetPosition = target.transform.position;
+            if (target.GetComponent<Rigidbody>() != null)
+            {
+                // Add basic prediction
+                targetPosition += target.GetComponent<Rigidbody>().velocity * (projectileLifetime * 0.5f);
+            }
+
+            Vector3 fireDirection = (targetPosition - firingPoint.position).normalized;
+
+            // Check if this firing point is on the correct side to fire
+            float angleToTarget = Vector3.Angle(firingPoint.forward, fireDirection);
+            if (angleToTarget > attacker.FiringArc * 0.5f)
+            {
+                continue; // Skip this firing point if it's not facing the target
+            }
+
+            // Create the projectile
+            GameObject projectileObj = Instantiate(
+                projectilePrefab,
+                firingPoint.position,
+                Quaternion.LookRotation(fireDirection)
+            );
+
+            Projectile projectile = projectileObj.GetComponent<Projectile>();
+            if (projectile != null)
+            {
+                projectile.Initialize(attacker, target, projectileSpeed, attacker.AttackDamage, projectileLifetime);
+            }
+            else
+            {
+                Debug.LogError("[FiringSystem] Projectile prefab missing Projectile component!");
+                Destroy(projectileObj);
+            }
+
+            // Visual feedback
+            CreateMuzzleFlash(firingPoint.position, fireDirection);
         }
 
-        // Visual feedback
-        CreateMuzzleFlash(spawnPosition, fireDirection);
+        Debug.Log($"[FiringSystem] {attacker.ShipName} fired at {target.ShipName}");
     }
 
     private void CreateMuzzleFlash(Vector3 position, Vector3 direction)
@@ -101,18 +113,22 @@ public class FiringSystem : MonoBehaviour
     {
         if (!showDebugGizmos) return;
 
-        // Draw projectile spawn points for selected ships
+        // Draw firing points for selected ships
         Ship[] selectedShips = FindObjectsByType<Ship>(FindObjectsSortMode.None);
         foreach (Ship ship in selectedShips)
         {
             if (ship.IsSelected)
             {
-                Vector3 spawnPos = ship.transform.position + 
-                                  (ship.transform.forward * projectileSpawnOffset) + 
-                                  Vector3.up;
-                Gizmos.color = Color.yellow;
-                Gizmos.DrawWireSphere(spawnPos, 0.5f);
-                Gizmos.DrawLine(ship.transform.position, spawnPos);
+                Transform[] firingPoints = ship.GetFiringPoints();
+                if (firingPoints != null)
+                {
+                    foreach (Transform firingPoint in firingPoints)
+                    {
+                        Gizmos.color = Color.yellow;
+                        Gizmos.DrawWireSphere(firingPoint.position, 0.3f);
+                        Gizmos.DrawLine(firingPoint.position, firingPoint.position + firingPoint.forward * 2f);
+                    }
+                }
             }
         }
     }
