@@ -10,6 +10,15 @@ public class Projectile : MonoBehaviour
     private float lifetime;
     private float spawnTime;
     private Rigidbody rb;
+    private TrailRenderer trailRenderer; // Optional: for visual effect
+
+    [Header("Projectile Settings")]
+    [SerializeField] private float trackingSpeed = 2.0f; // How quickly projectile adjusts course
+    [SerializeField] private bool useTracking = true; // Whether projectile follows target
+
+    [Header("Visual Effects")]
+    [SerializeField] private GameObject hitEffectPrefab; // Optional: effect when hitting something
+    [SerializeField] private GameObject waterSplashPrefab; // Optional: effect when hitting water
 
     public void Initialize(Ship owner, Ship target, float projectileSpeed, float projectileDamage, float projectileLifetime)
     {
@@ -25,39 +34,49 @@ public class Projectile : MonoBehaviour
         {
             rb.useGravity = false;
             rb.velocity = transform.forward * speed;
+            rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
         }
         else
         {
             Debug.LogError("[Projectile] No Rigidbody component found!");
         }
+
+        trailRenderer = GetComponent<TrailRenderer>();
+        if (trailRenderer != null)
+        {
+            trailRenderer.enabled = true;
+        }
+
+        Debug.Log($"[Projectile] Initialized: Speed={speed}, Damage={damage}, Lifetime={lifetime}");
     }
 
     private void Update()
     {
         if (Time.time - spawnTime >= lifetime)
         {
-            Debug.Log("[Projectile] Lifetime expired, destroying");
-            Destroy(gameObject);
+            OnProjectileExpire();
             return;
         }
 
-        // Optional: Add tracking behavior for more advanced projectiles
-        if (targetShip != null && !targetShip.IsSinking)
+        if (useTracking && targetShip != null && !targetShip.IsSinking)
         {
-            Vector3 directionToTarget = (targetShip.transform.position - transform.position).normalized;
-            float trackingSpeed = 2.0f; // Adjust this value to control how quickly the projectile tracks
-            rb.velocity = Vector3.Lerp(rb.velocity.normalized, directionToTarget, Time.deltaTime * trackingSpeed) * speed;
-            transform.forward = rb.velocity.normalized;
+            UpdateTracking();
         }
     }
 
-    private void OnCollisionEnter(Collision collision)
+    private void UpdateTracking()
     {
-        Ship hitShip = collision.gameObject.GetComponent<Ship>();
+        Vector3 directionToTarget = (targetShip.transform.position - transform.position).normalized;
+        rb.velocity = Vector3.Lerp(rb.velocity.normalized, directionToTarget, Time.deltaTime * trackingSpeed) * speed;
+        transform.forward = rb.velocity.normalized;
+    }
+
+    private void OnTriggerEnter(Collider other)
+    {
+        Ship hitShip = other.GetComponent<Ship>();
 
         if (hitShip != null)
         {
-            // Don't damage the ship that fired the projectile
             if (hitShip != ownerShip)
             {
                 HandleShipHit(hitShip);
@@ -66,62 +85,57 @@ public class Projectile : MonoBehaviour
         else
         {
             // Hit something else (water, terrain, etc.)
-            HandleEnvironmentHit(collision);
+            HandleEnvironmentHit(other);
         }
 
-        // Destroy the projectile regardless of what it hit
-        Destroy(gameObject);
+        DestroyProjectile();
     }
 
     private void HandleShipHit(Ship hitShip)
     {
         Debug.Log($"[Projectile] Hit ship {hitShip.ShipName} from {ownerShip.ShipName}");
-
-        // Apply damage to the hit ship
         hitShip.TakeDamage(damage);
 
-        // Spawn hit effect if we have one
-        SpawnHitEffect(true);
-
-        // Could trigger sound effects here
-        PlayHitSound(true);
+        if (hitEffectPrefab != null)
+        {
+            Instantiate(hitEffectPrefab, transform.position, Quaternion.identity);
+        }
     }
 
-    private void HandleEnvironmentHit(Collision collision)
+    private void HandleEnvironmentHit(Collider other)
     {
-        Debug.Log($"[Projectile] Hit environment at {collision.contacts[0].point}");
+        Debug.Log($"[Projectile] Hit environment: {other.gameObject.name}");
 
-        // Spawn water splash or other environmental effect
-        SpawnHitEffect(false);
-
-        // Play appropriate sound effect
-        PlayHitSound(false);
+        // If it hit water level
+        if (transform.position.y <= 0)
+        {
+            if (waterSplashPrefab != null)
+            {
+                Vector3 splashPos = transform.position;
+                splashPos.y = 0;
+                Instantiate(waterSplashPrefab, splashPos, Quaternion.identity);
+            }
+        }
     }
 
-    private void SpawnHitEffect(bool isShipHit)
+    private void OnProjectileExpire()
     {
-        // TODO: Implement hit effects
-        // Example:
-        // if (isShipHit && shipHitEffectPrefab != null)
-        // {
-        //     Instantiate(shipHitEffectPrefab, transform.position, Quaternion.identity);
-        // }
-        // else if (!isShipHit && waterHitEffectPrefab != null)
-        // {
-        //     Instantiate(waterHitEffectPrefab, transform.position, Quaternion.identity);
-        // }
+        Debug.Log("[Projectile] Lifetime expired");
+        DestroyProjectile();
     }
 
-    private void PlayHitSound(bool isShipHit)
+    private void DestroyProjectile()
     {
-        // TODO: Implement sound effects
-        // Example:
-        // AudioSource.PlayClipAtPoint(isShipHit ? shipHitSound : waterHitSound, transform.position);
+        if (trailRenderer != null)
+        {
+            trailRenderer.enabled = false;
+        }
+
+        Destroy(gameObject);
     }
 
     private void OnDrawGizmos()
     {
-        // Draw debug visualization in editor
         if (targetShip != null)
         {
             Gizmos.color = Color.red;
