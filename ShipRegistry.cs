@@ -5,6 +5,27 @@ public class ShipRegistry : MonoBehaviour
 {
     [SerializeField] private bool debugPositions = false;
     private HashSet<Vector3> occupiedPositions = new HashSet<Vector3>();
+    private HashSet<Ship> registeredShips = new HashSet<Ship>();
+
+    public void RegisterShip(Ship ship)
+    {
+        if (ship == null)
+        {
+            Debug.LogWarning("[ShipRegistry] Attempted to register null ship");
+            return;
+        }
+
+        registeredShips.Add(ship);
+        RegisterShipPosition(ship.transform.position);
+
+        // Register with FactionManager if available
+        if (FactionManager.Instance != null)
+        {
+            FactionManager.Instance.RegisterShip(ship);
+        }
+
+        Debug.Log($"[ShipRegistry] Registered ship {ship.ShipName}");
+    }
 
     public void RegisterShipPosition(Vector3 position)
     {
@@ -30,6 +51,14 @@ public class ShipRegistry : MonoBehaviour
         {
             Debug.Log($"[ShipRegistry] Ship {ship.ShipName} destroyed, removing from registry");
             UnregisterShipPosition(ship.transform.position);
+            registeredShips.Remove(ship);
+
+            // Notify FactionManager if available
+            if (FactionManager.Instance != null)
+            {
+                FactionManager.Instance.UnregisterShip(ship);
+            }
+
             Destroy(ship.gameObject, 2f); // Delayed destruction for effects
         }
     }
@@ -63,9 +92,15 @@ public class ShipRegistry : MonoBehaviour
     public void Clear()
     {
         occupiedPositions.Clear();
+        registeredShips.Clear();
         if (debugPositions)
         {
-            Debug.Log("[ShipRegistry] Cleared all registered positions");
+            Debug.Log("[ShipRegistry] Cleared all registered positions and ships");
         }
+    }
+
+    public IReadOnlyCollection<Ship> GetAllShips()
+    {
+        return registeredShips;
     }
 }
