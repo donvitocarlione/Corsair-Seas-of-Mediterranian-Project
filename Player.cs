@@ -3,50 +3,34 @@ using System.Collections.Generic;
 
 public class Player : Pirate
 {
+    private List<Ship> controlledShips = new List<Ship>();
     private Ship selectedShip;
-    private ShipSelectionUI shipSelectionUI;
 
-    private void Start()
-    {
-        Debug.Log($"[Player] Initialized Player - Ships owned: {GetOwnedShips().Count}");
-    }
+    public Ship SelectedShip => selectedShip;
+    public IReadOnlyList<Ship> ControlledShips => controlledShips;
 
-    public override void AddShip(Ship ship)
+    public virtual void AddShip(Ship ship)
     {
         if (ship == null)
         {
-            Debug.LogError("[Player] Attempting to add a null ship!");
+            Debug.LogWarning("[Player] Attempted to add null ship");
             return;
         }
 
-        Debug.Log($"[Player] Adding ship {ship.ShipName} to player's fleet");
-        
-        base.AddShip(ship);
-        
-        // Remove AI controller if present
-        AIShipController aiController = ship.GetComponent<AIShipController>();
-        if (aiController != null)
+        if (!controlledShips.Contains(ship))
         {
-            Debug.Log($"[Player] Removing AI controller from ship {ship.ShipName}");
-            Destroy(aiController);
-        }
-        
-        // Update UI
-        if (shipSelectionUI != null)
-        {
-            Debug.Log($"[Player] Updating ship selection UI with {GetOwnedShips().Count} ships");
-            shipSelectionUI?.UpdateShipList(GetOwnedShips());
-        }
+            controlledShips.Add(ship);
+            Debug.Log($"[Player] Added ship: {ship.Name}");
 
-        // Auto-select if this is the first ship
-        if (selectedShip == null && GetOwnedShips().Count == 1)
-        {
-            Debug.Log($"[Player] Auto-selecting first ship {ship.ShipName}");
-            SelectShip(ship);
+            // If this is our first ship, automatically select it
+            if (selectedShip == null)
+            {
+                SelectShip(ship);
+            }
         }
     }
 
-    public override void SelectShip(Ship ship)
+    public virtual void SelectShip(Ship ship)
     {
         if (ship == null)
         {
@@ -54,77 +38,38 @@ public class Player : Pirate
             return;
         }
 
-        if (!GetOwnedShips().Contains(ship))
+        if (!controlledShips.Contains(ship))
         {
-            Debug.LogWarning($"[Player] Attempted to select ship {ship.ShipName} not owned by player");
+            Debug.LogWarning($"[Player] Attempted to select uncontrolled ship: {ship.Name}");
             return;
         }
 
-        Debug.Log($"[Player] Selecting ship: {ship.ShipName}");
-        
-        // Deselect current ship if any
-        if (selectedShip != null)
-        {
-            Debug.Log($"[Player] Deselecting previous ship: {selectedShip.ShipName}");
-        }
-
-        base.SelectShip(ship);
         selectedShip = ship;
+        Debug.Log($"[Player] Selected ship: {ship.Name}");
     }
 
-    public void SelectNextShip()
-    {
-        List<Ship> ownedShips = GetOwnedShips();
-        if (ownedShips.Count == 0)
-        {
-            Debug.LogWarning("[Player] Cannot select next ship - no ships owned");
-            return;
-        }
-
-        int currentIndex = selectedShip != null ? ownedShips.IndexOf(selectedShip) : -1;
-        int nextIndex = (currentIndex + 1) % ownedShips.Count;
-        
-        Debug.Log($"[Player] Cycling ship selection from index {currentIndex} to {nextIndex}");
-        SelectShip(ownedShips[nextIndex]);
-    }
-
-    public Ship GetSelectedShip()
-    {
-        if (selectedShip == null)
-        {
-            Debug.LogWarning("[Player] GetSelectedShip called but no ship is selected");
-        }
-        else
-        {
-            Debug.Log($"[Player] GetSelectedShip returning: {selectedShip.ShipName}");
-        }
-        return selectedShip;
-    }
-
-    public override void RemoveShip(Ship ship)
+    public virtual void RemoveShip(Ship ship)
     {
         if (ship == null)
         {
-            Debug.LogError("[Player] Attempting to remove null ship");
+            Debug.LogWarning("[Player] Attempted to remove null ship");
             return;
         }
 
-        Debug.Log($"[Player] Removing ship {ship.ShipName} from player's fleet");
-
-        // If removing currently selected ship, clear selection
-        if (ship == selectedShip)
+        if (controlledShips.Contains(ship))
         {
-            Debug.Log($"[Player] Removed ship was selected - clearing selection");
-            selectedShip = null;
-        }
+            controlledShips.Remove(ship);
+            Debug.Log($"[Player] Removed ship: {ship.Name}");
 
-        base.RemoveShip(ship);
-
-        // Update UI
-        if (shipSelectionUI != null)
-        {
-            Debug.Log($"[Player] Updating ship selection UI after removal - {GetOwnedShips().Count} ships remaining");
-            shipSelectionUI.UpdateShipList(GetOwnedShips());
+            // If we removed the selected ship, select a new one if available
+            if (ship == selectedShip)
+            {
+                selectedShip = controlledShips.Count > 0 ? controlledShips[0] : null;
+                if (selectedShip != null)
+                {
+                    Debug.Log($"[Player] Auto-selected new ship: {selectedShip.Name}");
+                }
+            }
         }
     }
 }
