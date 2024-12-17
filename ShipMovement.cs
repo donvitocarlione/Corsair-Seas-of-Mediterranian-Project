@@ -116,6 +116,18 @@ public class ShipMovement : MonoBehaviour
             CombatSystem.Instance.SetCombatTarget(ownShip, target);
         }
     }
+
+    // Add the missing ClearTargetPosition method
+    public void ClearTargetPosition()
+    {
+        targetPosition = transform.position;
+        targetShip = null;
+        isMoving = false;
+        currentSpeed = 0f;
+        rb.velocity = Vector3.zero;
+        rb.angularVelocity = Vector3.zero;
+        Debug.Log($"[ShipMovement] Cleared target position for {gameObject.name}");
+    }
     
     void UpdateCombatMovement()
     {
