@@ -84,10 +84,29 @@ public class FactionInitializer : MonoBehaviour
                 GameObject shipPrefab = data.GetRandomShipPrefab();
                 if (shipPrefab != null)
                 {
-                    shipSpawner.SpawnShip(data.Faction, shipPrefab);
+                    // Get a random spawn point position and rotation
+                    Ship ship = shipSpawner.SpawnShip(
+                        data.Faction,
+                        shipPrefab,
+                        GetRandomSpawnPosition(),
+                        Quaternion.Euler(0, Random.Range(0f, 360f), 0)
+                    );
+                    
+                    if (ship != null)
+                    {
+                        Debug.Log($"[FactionInitializer] Successfully spawned {ship.ShipName} for {data.Faction}");
+                    }
                 }
             }
             Debug.Log($"[FactionInitializer] Spawned {data.InitialShipCount} ships for {data.Faction}");
         }
+    }
+
+    private Vector3 GetRandomSpawnPosition()
+    {
+        // For now, just return a random position in a reasonable range
+        float spawnRadius = 100f; // Adjust this value based on your game's scale
+        Vector2 randomCircle = Random.insideUnitCircle * spawnRadius;
+        return new Vector3(randomCircle.x, 0, randomCircle.y);
     }
 }
