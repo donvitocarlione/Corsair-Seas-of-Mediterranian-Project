@@ -24,6 +24,7 @@ public class InputManager : MonoBehaviour
         if (player == null)
         {
             Debug.LogError("[InputManager] No Player found in scene!");
+            return;
         }
 
         if (mainCamera == null)
@@ -32,8 +33,11 @@ public class InputManager : MonoBehaviour
             if (mainCamera == null)
             {
                 Debug.LogError("[InputManager] No main camera found!");
+                return;
             }
         }
+
+        Debug.Log($"[InputManager] Initialized with surfaceLayer: {LayerMask.LayerToName(surfaceLayer)} and shipLayer: {LayerMask.LayerToName(shipLayer)}");
     }
 
     private void Update()
@@ -44,11 +48,13 @@ public class InputManager : MonoBehaviour
 
         if (Input.GetKeyDown(KeyCode.Tab))
         {
+            Debug.Log("[InputManager] Tab pressed - selecting next ship");
             player.SelectNextShip();
         }
 
         if (Input.GetMouseButtonDown(1)) // Right click
         {
+            Debug.Log("[InputManager] Right click detected - handling movement/target input");
             HandleMovementOrTargetInput();
         }
 
@@ -75,20 +81,13 @@ public class InputManager : MonoBehaviour
             {
                 if (hoveredShip != ship)
                 {
-                    // Un-hover previous ship
-                    if (hoveredShip != null)
-                    {
-                        // TODO: Remove hover effect from previous ship
-                    }
-
                     hoveredShip = ship;
-                    // TODO: Add hover effect to new ship
+                    Debug.Log($"[InputManager] Hovering over ship: {ship.ShipName}");
                 }
             }
         }
         else if (hoveredShip != null)
         {
-            // TODO: Remove hover effect from previous ship
             hoveredShip = null;
         }
     }
@@ -98,16 +97,19 @@ public class InputManager : MonoBehaviour
         Ship selectedShip = player.GetSelectedShip();
         if (selectedShip == null)
         {
-            Debug.Log("[InputManager] No ship selected for movement/targeting");
+            Debug.LogWarning("[InputManager] No ship selected for movement/targeting");
             return;
         }
 
+        Debug.Log($"[InputManager] Handling input for selected ship: {selectedShip.ShipName}");
         Ray ray = mainCamera.ScreenPointToRay(Input.mousePosition);
+        Debug.Log($"[InputManager] Mouse Position: {Input.mousePosition}");
         RaycastHit hit;
 
         // First check for target ships
         if (Physics.Raycast(ray, out hit, maxTargetingDistance, shipLayer))
         {
+            Debug.Log($"[InputManager] Hit ship layer at point {hit.point}, object: {hit.collider.gameObject.name}, layer: {LayerMask.LayerToName(hit.collider.gameObject.layer)}");
             Ship targetShip = hit.collider.GetComponent<Ship>();
             if (targetShip != null && !targetShip.IsSinking && targetShip != selectedShip)
             {
@@ -119,6 +121,7 @@ public class InputManager : MonoBehaviour
         // If no ship hit, handle movement
         if (Physics.Raycast(ray, out hit, Mathf.Infinity, surfaceLayer))
         {
+            Debug.Log($"[InputManager] Hit surface at point {hit.point}, object: {hit.collider.gameObject.name}");
             SetShipTargetPosition(selectedShip, hit.point);
         }
         else
@@ -129,11 +132,12 @@ public class InputManager : MonoBehaviour
             if (waterPlane.Raycast(ray, out enter))
             {
                 Vector3 hitPoint = ray.GetPoint(enter);
+                Debug.Log($"[InputManager] Projected to water plane at point {hitPoint}");
                 SetShipTargetPosition(selectedShip, hitPoint);
             }
             else
             {
-                Debug.Log("[InputManager] Could not determine target position");
+                Debug.LogWarning("[InputManager] Could not determine target position - ray did not intersect water plane");
             }
         }
     }
@@ -143,7 +147,7 @@ public class InputManager : MonoBehaviour
         if (attacker.ShipOwner != null && target.ShipOwner != null && 
             attacker.ShipOwner.Faction == target.ShipOwner.Faction)
         {
-            Debug.Log("[InputManager] Cannot target friendly ships");
+            Debug.Log($"[InputManager] Cannot target friendly ship {target.ShipName} (same faction)");
             return;
         }
 
@@ -151,7 +155,11 @@ public class InputManager : MonoBehaviour
         if (movement != null)
         {
             movement.SetTargetPosition(targetPoint, target);
-            Debug.Log($"[InputManager] {attacker.ShipName} targeting {target.ShipName}");
+            Debug.Log($"[InputManager] {attacker.ShipName} targeting {target.ShipName} at position {targetPoint}");
+        }
+        else
+        {
+            Debug.LogError($"[InputManager] {attacker.ShipName} has no ShipMovement component!");
         }
     }
 
@@ -168,7 +176,12 @@ public class InputManager : MonoBehaviour
 
         if (currentTarget != null && selectedShip.CanFire)
         {
+            Debug.Log($"[InputManager] {selectedShip.ShipName} attempting to fire at {currentTarget.ShipName}");
             selectedShip.Fire(currentTarget);
+        }
+        else
+        {
+            Debug.Log($"[InputManager] Cannot fire: Target={currentTarget != null}, CanFire={selectedShip.CanFire}");
         }
     }
 
