@@ -8,13 +8,11 @@ public class CombatSystem : MonoBehaviour
 
     [Header("Debug Settings")]
     [SerializeField] private bool showDebugGizmos = true;
-    [SerializeField] private bool ignoreFactionChecks = false;
     [SerializeField] private bool logCombatDetails = true;
-    
+
     [Header("Combat Parameters")]
     [SerializeField] private float combatUpdateInterval = 0.5f;
     [SerializeField] private float maxCombatRange = 200f;
-    [SerializeField] private float minDisengageDistance = 250f;
 
     private Dictionary<Ship, Ship> combatTargets = new Dictionary<Ship, Ship>();
     private Dictionary<Ship, float> lastRangeCheckTime = new Dictionary<Ship, float>();
@@ -28,52 +26,17 @@ public class CombatSystem : MonoBehaviour
         }
         instance = this;
         DontDestroyOnLoad(gameObject);
-        
-        LogSystem("CombatSystem initialized");
-    }
-
-    private void Start()
-    {
-        ValidateFactionsSetup();
-    }
-
-    private void ValidateFactionsSetup()
-    {
-        if (FactionManager.Instance == null)
-        {
-            LogError("FactionManager not found in scene!");
-            return;
-        }
-
-        var factions = System.Enum.GetValues(typeof(FactionType));
-        LogSystem("Checking faction relations:");
-        foreach (FactionType faction1 in factions)
-        {
-            foreach (FactionType faction2 in factions)
-            {
-                if (faction1 != faction2)
-                {
-                    float relation = FactionManager.Instance.GetRelationBetweenFactions(faction1, faction2);
-                    LogSystem($"{faction1} vs {faction2}: Relation = {relation}, At War = {FactionManager.Instance.AreFactionsAtWar(faction1, faction2)}");
-                }
-            }
-        }
     }
 
     public Ship GetCurrentTarget(Ship ship)
     {
-        if (ship == null) return null;
         return combatTargets.TryGetValue(ship, out Ship target) ? target : null;
     }
 
     public void SetCombatTarget(Ship attacker, Ship target)
     {
         if (!ValidateCombatParticipants(attacker, target)) return;
-        
-        if (ValidateFactionRelations(attacker, target))
-        {
-            InitiateCombat(attacker, target);
-        }
+        InitiateCombat(attacker, target);
     }
 
     private bool ValidateCombatParticipants(Ship attacker, Ship target)
@@ -99,34 +62,14 @@ public class CombatSystem : MonoBehaviour
         return true;
     }
 
-    private bool ValidateFactionRelations(Ship attacker, Ship target)
-    {
-        if (ignoreFactionChecks) return true;
-
-        var attackerFaction = attacker.ShipOwner?.Faction ?? FactionType.None;
-        var targetFaction = target.ShipOwner?.Faction ?? FactionType.None;
-
-        if (attackerFaction == targetFaction)
-        {
-            LogWarning($"Friendly fire prevented: {attackerFaction}");
-            return false;
-        }
-
-        bool atWar = FactionManager.Instance?.AreFactionsAtWar(attackerFaction, targetFaction) ?? false;
-        LogSystem($"Faction check: {attackerFaction} vs {targetFaction}, At War: {atWar}");
-        return atWar || ignoreFactionChecks;
-    }
-
     private void InitiateCombat(Ship attacker, Ship target)
     {
         combatTargets[attacker] = target;
         lastRangeCheckTime[attacker] = 0f;
-        
-        // Set combat state in ShipMovement
+
         var movement = attacker.GetComponent<ShipMovement>();
         if (movement != null)
         {
-            // The movement component will handle position updates
             LogSystem($"{attacker.ShipName} pursuing {target.ShipName}");
         }
     }
@@ -173,7 +116,6 @@ public class CombatSystem : MonoBehaviour
 
         float distance = Vector3.Distance(attacker.transform.position, target.transform.position);
         
-        // Use maxCombatRange as the disengage distance
         if (distance > maxCombatRange)
         {
             LogSystem($"{attacker.ShipName} disengaging - Target beyond max combat range ({distance:F1} units)");
@@ -195,7 +137,6 @@ public class CombatSystem : MonoBehaviour
             combatTargets.Remove(ship);
             lastRangeCheckTime.Remove(ship);
 
-            // Reset ship movement if applicable
             var movement = ship.GetComponent<ShipMovement>();
             if (movement != null)
             {
