@@ -1,33 +1,31 @@
 # Corsair: Seas of Mediterranean
 
-A Unity-based naval game set in the Mediterranean Sea featuring historical ships, trade routes, and naval warfare.
-
-## Game Features
-- Dynamic ship movement and combat system
-- Advanced faction diplomacy system
-- Historically inspired Mediterranean setting
-- AI-controlled ships with realistic behavior
-- Quest and mission system
-- Port management and trading
-- Realistic water physics and buoyancy
-
-## Technical Features
-- Written in C# for Unity
-- Modular codebase architecture
-- Flexible faction management system
-- Custom input handling system
-- Camera management for naval gameplay
-- Ship selection and movement controls
+A naval combat game set in the Mediterranean Sea, featuring ship-to-ship combat, naval tactics, and exploration.
 
 ## Core Systems
-- Ship Movement and Physics
-- Faction Management
-- AI Navigation
-- Diplomacy
-- Quest System
-- Player Management
-- Port System
 
-## Development Status
-- Currently in active development
-- Access verified on December 14, 2024
+- Ship Movement and Controls
+- Naval Combat
+- Ship Management
+- Port Interaction
+- AI Ship Behavior
+- Quest System
+- Selection System
+- Camera Controls
+
+## Ship Features
+
+- Health and Damage System
+- Ammo Management
+- Firing Arc System
+- Ship-to-Ship Combat
+- Buoyancy Simulation
+
+## Development
+
+This project is under active development. The faction system has been temporarily removed to focus on core gameplay mechanics.
+
+## Requirements
+
+- Unity 2022.3 or later
+- .NET Framework 4.x
