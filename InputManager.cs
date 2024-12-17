@@ -11,8 +11,7 @@ public class InputManager : MonoBehaviour
     [SerializeField] private Camera mainCamera;
 
     [Header("Combat Settings")]
-    [SerializeField] private float maxTargetingDistance = 50f;
-    [SerializeField] private KeyCode attackKey = KeyCode.Space;
+    [SerializeField] private float maxTargetingDistance = 150f;
     [SerializeField] private KeyCode cancelTargetKey = KeyCode.Escape;
     
     private Player player;
@@ -60,11 +59,6 @@ public class InputManager : MonoBehaviour
             }
         }
 
-        if (Input.GetKeyDown(attackKey))
-        {
-            HandleAttackInput();
-        }
-
         if (Input.GetKeyDown(cancelTargetKey))
         {
             CancelCurrentTarget();
@@ -105,7 +99,7 @@ public class InputManager : MonoBehaviour
             Ship targetShip = hit.collider.GetComponent<Ship>();
             if (targetShip != null && !targetShip.IsSinking && targetShip != selectedShip)
             {
-                HandleCombatInput(selectedShip, targetShip, hit.point);
+                HandleCombatInput(selectedShip, targetShip);
                 return;
             }
         }
@@ -114,7 +108,7 @@ public class InputManager : MonoBehaviour
         HandleMovementInput(selectedShip, ray);
     }
 
-    private void HandleCombatInput(Ship selectedShip, Ship targetShip, Vector3 targetPoint)
+    private void HandleCombatInput(Ship selectedShip, Ship targetShip)
     {
         ShipMovement movement = selectedShip.GetComponent<ShipMovement>();
         if (movement == null) return;
@@ -124,13 +118,13 @@ public class InputManager : MonoBehaviour
             selectedShip.ShipOwner.Faction == targetShip.ShipOwner.Faction)
         {
             // For friendly ships, just move to their position
-            movement.SetTargetPosition(targetPoint);
+            movement.SetTargetPosition(targetShip.transform.position);
             Debug.Log($"[InputManager] Moving to friendly ship {targetShip.ShipName}'s position");
             return;
         }
 
         // Set combat target
-        movement.SetTargetPosition(targetPoint, targetShip);
+        movement.SetTargetPosition(targetShip.transform.position, targetShip);
         Debug.Log($"[InputManager] {selectedShip.ShipName} targeting enemy ship {targetShip.ShipName}");
     }
 
@@ -139,7 +133,6 @@ public class InputManager : MonoBehaviour
         ShipMovement movement = selectedShip.GetComponent<ShipMovement>();
         if (movement == null) return;
 
-        // Only override combat movement if explicitly clicking on water/terrain
         RaycastHit hit;
         Vector3 targetPoint;
 
@@ -149,7 +142,6 @@ public class InputManager : MonoBehaviour
         }
         else
         {
-            // Project to water plane if no surface hit
             Plane waterPlane = new Plane(Vector3.up, new Vector3(0, waterLevel, 0));
             float enter;
             if (!waterPlane.Raycast(ray, out enter))
@@ -159,7 +151,7 @@ public class InputManager : MonoBehaviour
             targetPoint = ray.GetPoint(enter);
         }
 
-        // If ship is in combat, check if we should allow movement
+        // If ship is in combat and moving far, clear combat
         if (movement.IsInCombat())
         {
             Ship targetShip = movement.GetTargetShip();
@@ -168,7 +160,6 @@ public class InputManager : MonoBehaviour
                 float distanceToTarget = Vector3.Distance(targetPoint, targetShip.transform.position);
                 if (distanceToTarget > maxTargetingDistance * 1.5f)
                 {
-                    // If moving far from combat target, clear combat
                     movement.ClearCombatTarget();
                 }
             }
@@ -176,24 +167,6 @@ public class InputManager : MonoBehaviour
 
         movement.SetTargetPosition(targetPoint);
         Debug.Log($"[InputManager] Set movement target for {selectedShip.name} to {targetPoint}");
-    }
-
-    private void HandleAttackInput()
-    {
-        Ship selectedShip = player.GetSelectedShip();
-        if (selectedShip == null) return;
-
-        Ship currentTarget = null;
-        if (CombatSystem.Instance != null)
-        {
-            currentTarget = CombatSystem.Instance.GetCurrentTarget(selectedShip);
-        }
-
-        if (currentTarget != null && selectedShip.CanFire)
-        {
-            Debug.Log($"[InputManager] {selectedShip.ShipName} firing at {currentTarget.ShipName}");
-            selectedShip.Fire(currentTarget);
-        }
     }
 
     private void CancelCurrentTarget()
