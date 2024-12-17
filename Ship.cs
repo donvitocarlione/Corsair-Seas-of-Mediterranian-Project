@@ -95,4 +95,19 @@ public class Ship : MonoBehaviour
             reloadTimer = reloadTime;
         }
     }
+
+    public virtual void Fire(Ship target)
+    {
+        if (!CanFire)
+        {
+            Debug.Log($"[Ship] {ShipName} cannot fire");
+            return;
+        }
+        if (firingSystem != null)
+        {
+            firingSystem.FireProjectile(this, target);
+            ConsumeAmmo();
+        }
+        Debug.Log($"[Ship] {ShipName} is firing at {target.ShipName}");
+    }
 }
