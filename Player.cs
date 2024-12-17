@@ -72,4 +72,23 @@ public class Player : Pirate
             }
         }
     }
+
+    public virtual void SelectNextShip()
+    {
+        if (controlledShips.Count == 0)
+        {
+            Debug.LogWarning("[Player] No controlled ships");
+            return;
+        }
+
+        int currentIndex = controlledShips.IndexOf(selectedShip);
+        int nextIndex = (currentIndex + 1) % controlledShips.Count;
+        SelectShip(controlledShips[nextIndex]);
+        Debug.Log($"[Player] Selected next ship: {selectedShip.Name}");
+    }
+
+    public virtual Ship GetSelectedShip()
+    {
+        return selectedShip;
+    }
 }
