@@ -14,7 +14,7 @@ public class FactionManager : MonoBehaviour
     // Events
     public delegate void OnShipUnregisteredDelegate(Ship ship);
     public delegate void OnRelationChangedDelegate(FactionType factionA, FactionType factionB, float newValue);
-    public delegate void OnInfluenceChangedDelegate(FactionType faction, float newValue);
+    public delegate void OnInfluenceChangedDelegate(FactionType faction, int newValue);
     public delegate void OnPortCapturedDelegate(Port port, FactionType oldOwner, FactionType newOwner);
     public delegate void OnShipRegisteredDelegate(Ship ship);
 
@@ -85,5 +85,24 @@ public class FactionManager : MonoBehaviour
 
         OnRelationChanged?.Invoke(factionA, factionB, value);
         Debug.Log($"[FactionManager] Relation updated between {factionA} and {factionB} to {value}");
+    }
+
+    // Add methods to invoke the unused events
+    public void RegisterShip(Ship ship)
+    {
+        OnShipRegistered?.Invoke(ship);
+        Debug.Log($"[FactionManager] Ship registered: {ship.ShipName}");
+    }
+
+    public void UnregisterShip(Ship ship)
+    {
+        OnShipUnregistered?.Invoke(ship);
+        Debug.Log($"[FactionManager] Ship unregistered: {ship.ShipName}");
+    }
+
+    public void NotifyPortCaptured(Port port, FactionType oldOwner, FactionType newOwner)
+    {
+        OnPortCaptured?.Invoke(port, oldOwner, newOwner);
+        Debug.Log($"[FactionManager] Port captured from {oldOwner} by {newOwner}");
     }
 }
