@@ -60,7 +60,6 @@ public class CombatSystem : MonoBehaviour
         }
     }
 
-    // Add the missing GetCurrentTarget method
     public Ship GetCurrentTarget(Ship ship)
     {
         if (ship == null) return null;
@@ -123,15 +122,13 @@ public class CombatSystem : MonoBehaviour
         combatTargets[attacker] = target;
         lastRangeCheckTime[attacker] = 0f;
         
-        // Notify ship movement system
+        // Set combat state in ShipMovement
         var movement = attacker.GetComponent<ShipMovement>();
         if (movement != null)
         {
-            movement.SetTargetPosition(target.transform.position);
+            // The movement component will handle position updates
             LogSystem($"{attacker.ShipName} pursuing {target.ShipName}");
         }
-        
-        LogSystem($"Combat initiated: {attacker.ShipName} targeting {target.ShipName}");
     }
 
     private void Update()
@@ -176,17 +173,10 @@ public class CombatSystem : MonoBehaviour
 
         float distance = Vector3.Distance(attacker.transform.position, target.transform.position);
         
-        // Check if target is beyond max combat range
+        // Use maxCombatRange as the disengage distance
         if (distance > maxCombatRange)
         {
             LogSystem($"{attacker.ShipName} disengaging - Target beyond max combat range ({distance:F1} units)");
-            return false;
-        }
-
-        // Check if target is beyond disengage distance
-        if (distance > minDisengageDistance)
-        {
-            LogSystem($"{attacker.ShipName} disengaging - Target beyond disengage distance ({distance:F1} units)");
             return false;
         }
 
@@ -209,13 +199,15 @@ public class CombatSystem : MonoBehaviour
             var movement = ship.GetComponent<ShipMovement>();
             if (movement != null)
             {
-                movement.ClearTargetPosition();
+                movement.ClearCombatTarget();
             }
         }
     }
 
     private void ProcessCombatAction(Ship attacker, Ship target)
     {
+        if (attacker == null || target == null) return;
+
         float distance = Vector3.Distance(attacker.transform.position, target.transform.position);
         
         if (distance <= attacker.AttackRange)
@@ -235,7 +227,6 @@ public class CombatSystem : MonoBehaviour
         else
         {
             LogCombat($"{attacker.ShipName} pursuing target: Distance {distance:F1} units");
-            UpdatePursuit(attacker, target);
         }
 
         lastRangeCheckTime[attacker] = Time.time;
@@ -251,15 +242,6 @@ public class CombatSystem : MonoBehaviour
         else
         {
             LogCombat($"{attacker.ShipName} cannot fire: {(attacker.CurrentAmmo <= 0 ? "No ammo" : "Reloading")}");
-        }
-    }
-
-    private void UpdatePursuit(Ship attacker, Ship target)
-    {
-        var movement = attacker.GetComponent<ShipMovement>();
-        if (movement != null)
-        {
-            movement.SetTargetPosition(target.transform.position);
         }
     }
 
