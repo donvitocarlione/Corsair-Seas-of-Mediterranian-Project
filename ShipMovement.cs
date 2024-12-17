@@ -322,6 +322,18 @@ public class ShipMovement : MonoBehaviour
         }
     }
 
+    public void SetMovementDirection(Vector3 direction)
+    {
+        Vector3 worldDirection = direction.normalized;
+        worldDirection.y = 0; // Keep movement on the horizontal plane
+        
+        // Set target position some distance ahead in the desired direction
+        Vector3 targetPos = transform.position + worldDirection * 10f;
+        SetTargetPosition(targetPos);
+        
+        Debug.Log($"[ShipMovement] {gameObject.name} moving in direction {worldDirection}");
+    }
+
     public bool IsInCombat() => inCombat;
     public Ship GetTargetShip() => targetShip;
     public TargetType GetCurrentTargetType() => currentTargetType;
