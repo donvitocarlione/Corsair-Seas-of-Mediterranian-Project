@@ -9,7 +9,7 @@ public class FiringSystem : MonoBehaviour
         {
             if (instance == null)
             {
-                instance = FindObjectOfType<FiringSystem>();
+                instance = FindFirstObjectByType<FiringSystem>();
                 if (instance == null)
                 {
                     GameObject obj = new GameObject("FiringSystem");
