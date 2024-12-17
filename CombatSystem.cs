@@ -60,6 +60,13 @@ public class CombatSystem : MonoBehaviour
         }
     }
 
+    // Add the missing GetCurrentTarget method
+    public Ship GetCurrentTarget(Ship ship)
+    {
+        if (ship == null) return null;
+        return combatTargets.TryGetValue(ship, out Ship target) ? target : null;
+    }
+
     public void SetCombatTarget(Ship attacker, Ship target)
     {
         if (!ValidateCombatParticipants(attacker, target)) return;
