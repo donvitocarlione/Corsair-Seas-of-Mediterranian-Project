@@ -15,7 +15,7 @@ public class Ship : MonoBehaviour
     [SerializeField] private float ammoCount = 10f;
     [SerializeField] private float currentAmmo;
     [SerializeField] private float firingArc = 60f;
-    [SerializeField] private Transform[] firingPoints;  // Array of firing points
+    [SerializeField] private Transform[] firingPoints;
 
     private float lastFireTime;
     private ShipSelectionHandler selectionHandler;
@@ -24,7 +24,6 @@ public class Ship : MonoBehaviour
     private Pirate shipOwner;
 
     public string ShipName => shipName;
-    public string Name => shipName;
     public Pirate ShipOwner => shipOwner;
     public bool IsSelected => isSelected;
     public bool IsSinking => isSinking;
@@ -40,7 +39,6 @@ public class Ship : MonoBehaviour
 
     private void Awake()
     {
-        Debug.Log($"[Ship] Initializing {shipName}");
         currentHealth = maxHealth;
         currentAmmo = ammoCount;
         selectionHandler = GetComponent<ShipSelectionHandler>();
@@ -49,8 +47,7 @@ public class Ship : MonoBehaviour
         {
             Debug.LogError($"[Ship] No ShipSelectionHandler found on {shipName}");
         }
-
-        // Auto-find firing points if none are assigned
+        
         if (firingPoints == null || firingPoints.Length == 0)
         {
             Transform firingPointsParent = transform.Find("FiringPoints");
@@ -64,7 +61,7 @@ public class Ship : MonoBehaviour
             }
             else
             {
-                Debug.LogWarning($"[Ship] No firing points found on {shipName}. Creating default firing point.");
+                Debug.LogWarning($"[Ship] No firing points found on {shipName}. Creating default.");
                 CreateDefaultFiringPoint();
             }
         }
@@ -78,20 +75,16 @@ public class Ship : MonoBehaviour
 
         GameObject firingPoint = new GameObject("FiringPoint");
         firingPoint.transform.SetParent(firingPointsParent.transform);
-        firingPoint.transform.localPosition = new Vector3(0, 1f, 2f); // Adjust position as needed
+        firingPoint.transform.localPosition = new Vector3(0, 1f, 2f);
         firingPoint.transform.localRotation = Quaternion.identity;
 
         firingPoints = new Transform[] { firingPoint.transform };
     }
 
-    public Transform[] GetFiringPoints()
-    {
-        return firingPoints;
-    }
+    public Transform[] GetFiringPoints() => firingPoints;
 
-    public void Initialize(FactionType newFaction, string newName)
+    public void Initialize(string newName)
     {
-        Debug.Log($"[Ship] Initializing {shipName} with faction {newFaction} and name {newName}");
         SetName(newName);
     }
 
@@ -102,40 +95,28 @@ public class Ship : MonoBehaviour
 
     public void SetOwner(Pirate owner)
     {
-        Debug.Log($"[Ship] Setting owner for {shipName} to {(owner != null ? owner.GetType().Name : "null")}");
         shipOwner = owner;
     }
 
     public void ClearOwner()
     {
-        Debug.Log($"[Ship] Clearing owner for {shipName}");
         shipOwner = null;
     }
 
     public bool Select()
     {
-        Debug.Log($"[Ship] Attempting to select {shipName}");
+        if (isSinking || selectionHandler == null) return false;
 
-        if (isSinking)
-        {
-            Debug.LogWarning($"[Ship] Cannot select {shipName} - ship is sinking");
-            return false;
-        }
-
-        if (selectionHandler != null && selectionHandler.Select())
+        if (selectionHandler.Select())
         {
             isSelected = true;
-            Debug.Log($"[Ship] Successfully selected {shipName}");
             return true;
         }
-
-        Debug.LogWarning($"[Ship] Failed to select {shipName}");
         return false;
     }
 
     public void Deselect()
     {
-        Debug.Log($"[Ship] Deselecting {shipName}");
         if (selectionHandler != null)
         {
             selectionHandler.Deselect();
@@ -145,37 +126,24 @@ public class Ship : MonoBehaviour
 
     public void Fire(Ship target)
     {
-        if (target == null || !CanFire)
-        {
-            Debug.LogWarning($"[Ship] Cannot fire: target null={target == null}, canFire={CanFire}");
-            return;
-        }
+        if (target == null || !CanFire) return;
 
         if (FiringSystem.Instance != null)
         {
             FiringSystem.Instance.FireProjectile(this, target);
             currentAmmo--;
             lastFireTime = Time.time;
-            Debug.Log($"[Ship] {shipName} fired at {target.ShipName}. Ammo remaining: {currentAmmo}");
-        }
-        else
-        {
-            Debug.LogError("[Ship] No FiringSystem found, can't fire!");
         }
     }
 
     public void Reload()
     {
-        Debug.Log($"[Ship] Reloading {shipName}");
         currentAmmo = ammoCount;
     }
 
     public void TakeDamage(float damage)
     {
-        Debug.Log($"[Ship] {shipName} taking {damage} damage");
         currentHealth = Mathf.Max(0, currentHealth - damage);
-
-        Debug.Log($"[Ship] {shipName} health: {currentHealth}/{maxHealth}");
 
         if (currentHealth <= 0 && !isSinking)
         {
@@ -185,7 +153,6 @@ public class Ship : MonoBehaviour
 
     private void StartSinking()
     {
-        Debug.Log($"[Ship] {shipName} starting to sink");
         isSinking = true;
 
         if (isSelected)
@@ -195,7 +162,6 @@ public class Ship : MonoBehaviour
 
         if (shipOwner != null)
         {
-            Debug.Log($"[Ship] Removing {shipName} from owner's fleet");
             shipOwner.RemoveShip(this);
             ClearOwner();
         }
@@ -213,32 +179,18 @@ public class Ship : MonoBehaviour
 
     public void Repair(float amount)
     {
-        if (isSinking)
-        {
-            Debug.LogWarning($"[Ship] Cannot repair {shipName} - ship is sinking");
-            return;
-        }
-
-        Debug.Log($"[Ship] Repairing {shipName} for {amount}");
+        if (isSinking) return;
         currentHealth = Mathf.Min(maxHealth, currentHealth + amount);
-        Debug.Log($"[Ship] {shipName} health after repair: {currentHealth}/{maxHealth}");
     }
 
     private void OnValidate()
     {
-        if (currentHealth > maxHealth)
-        {
-            currentHealth = maxHealth;
-        }
-        if (currentAmmo > ammoCount)
-        {
-            currentAmmo = ammoCount;
-        }
+        if (currentHealth > maxHealth) currentHealth = maxHealth;
+        if (currentAmmo > ammoCount) currentAmmo = ammoCount;
     }
 
     private void OnDrawGizmosSelected()
     {
-        // Draw firing points
         if (firingPoints != null)
         {
             Gizmos.color = Color.yellow;
@@ -252,11 +204,9 @@ public class Ship : MonoBehaviour
             }
         }
 
-        // Draw attack range
         Gizmos.color = new Color(1, 0, 0, 0.2f);
         Gizmos.DrawWireSphere(transform.position, attackRange);
 
-        // Draw firing arc
         Gizmos.color = new Color(1, 1, 0, 0.2f);
         Vector3 forward = transform.forward;
         float radius = attackRange;
