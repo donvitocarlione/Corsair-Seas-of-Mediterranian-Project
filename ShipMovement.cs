@@ -26,7 +26,6 @@ public class ShipMovement : MonoBehaviour
     private float currentSpeed;
     private bool isMoving;
     private Rigidbody rb;
-    private Buoyancy buoyancy;
     private Ship targetShip;
     private Ship ownShip;
     
@@ -39,7 +38,6 @@ public class ShipMovement : MonoBehaviour
     void Start()
     {
         rb = GetComponent<Rigidbody>();
-        buoyancy = GetComponent<Buoyancy>();
         ownShip = GetComponent<Ship>();
         
         if (rb == null)
@@ -58,11 +56,13 @@ public class ShipMovement : MonoBehaviour
         rb.angularDrag = waterDrag;
         rb.useGravity = false;
         
-        Debug.Log($"[ShipMovement] Initialized on {gameObject.name}");
+        Debug.Log($"[ShipMovement] Initialized {gameObject.name} with maxSpeed={maxSpeed}, stoppingDistance={stoppingDistance}");
     }
     
     void FixedUpdate()
     {
+        Debug.Log($"[ShipMovement] {gameObject.name} FixedUpdate - isMoving: {isMoving}, velocity: {rb.velocity}, position: {transform.position}, targetPosition: {targetPosition}");
+        
         if (isMoving)
         {
             if (targetShip != null && !targetShip.IsSinking)
@@ -76,7 +76,7 @@ public class ShipMovement : MonoBehaviour
         }
         else
         {
-            rb.linearVelocity = Vector3.Lerp(rb.linearVelocity, Vector3.zero, Time.fixedDeltaTime * 5f);
+            rb.velocity = Vector3.Lerp(rb.velocity, Vector3.zero, Time.fixedDeltaTime * 5f);
             rb.angularVelocity = Vector3.Lerp(rb.angularVelocity, Vector3.zero, Time.fixedDeltaTime * 5f);
         }
         
@@ -97,8 +97,8 @@ public class ShipMovement : MonoBehaviour
         targetPosition = position;
         targetShip = null;
         isMoving = true;
-        currentSpeed = rb.linearVelocity.magnitude;
-        Debug.Log($"[ShipMovement] Set target position for {gameObject.name} to {position}");
+        currentSpeed = rb.velocity.magnitude;
+        Debug.Log($"[ShipMovement] {gameObject.name} set target position to {position}, current speed: {currentSpeed}");
     }
 
     public void SetTargetPosition(Vector3 position, Ship target)
@@ -107,17 +107,15 @@ public class ShipMovement : MonoBehaviour
         targetPosition = position;
         targetShip = target;
         isMoving = true;
-        currentSpeed = rb.linearVelocity.magnitude;
-        Debug.Log($"[ShipMovement] Set combat target for {gameObject.name} to {target.ShipName}");
+        currentSpeed = rb.velocity.magnitude;
+        Debug.Log($"[ShipMovement] {gameObject.name} set combat target {target.ShipName} at position {position}, current speed: {currentSpeed}");
 
-        // Set combat target in the combat system
         if (CombatSystem.Instance != null)
         {
             CombatSystem.Instance.SetCombatTarget(ownShip, target);
         }
     }
 
-    // Add the missing ClearTargetPosition method
     public void ClearTargetPosition()
     {
         targetPosition = transform.position;
@@ -126,7 +124,7 @@ public class ShipMovement : MonoBehaviour
         currentSpeed = 0f;
         rb.velocity = Vector3.zero;
         rb.angularVelocity = Vector3.zero;
-        Debug.Log($"[ShipMovement] Cleared target position for {gameObject.name}");
+        Debug.Log($"[ShipMovement] {gameObject.name} cleared target position");
     }
     
     void UpdateCombatMovement()
@@ -136,22 +134,21 @@ public class ShipMovement : MonoBehaviour
         Vector3 directionToTarget = (targetShip.transform.position - transform.position);
         float distanceToTarget = directionToTarget.magnitude;
 
-        // Calculate ideal combat position
+        Debug.Log($"[ShipMovement] {gameObject.name} combat update - distance to {targetShip.ShipName}: {distanceToTarget}");
+
         Vector3 idealPosition = CalculateIdealCombatPosition();
-        
-        // Check if we need to reposition
         bool needsRepositioning = ShouldReposition(distanceToTarget);
 
         if (needsRepositioning)
         {
-            // Move towards ideal position
+            Debug.Log($"[ShipMovement] {gameObject.name} repositioning to ideal position {idealPosition}");
             targetPosition = idealPosition;
             MoveTowardsTarget();
             lastRepositionTime = Time.time;
         }
         else
         {
-            // Maintain position and rotate to face target
+            Debug.Log($"[ShipMovement] {gameObject.name} maintaining position and rotating to face target");
             RotateTowardsTarget(targetShip.transform.position);
         }
     }
@@ -160,24 +157,20 @@ public class ShipMovement : MonoBehaviour
     {
         if (targetShip == null) return transform.position;
 
-        // Get the direction from target to our ship
         Vector3 directionFromTarget = (transform.position - targetShip.transform.position).normalized;
-        
-        // Calculate the ideal position at optimal combat distance
         Vector3 idealPosition = targetShip.transform.position + directionFromTarget * optimalCombatDistance;
         idealPosition.y = waterLevel + buoyancyOffset;
 
+        Debug.Log($"[ShipMovement] {gameObject.name} calculated ideal combat position: {idealPosition}");
         return idealPosition;
     }
 
     bool ShouldReposition(float currentDistance)
     {
-        // Check if we're too close or too far from optimal distance
         bool distanceInvalid = Mathf.Abs(currentDistance - optimalCombatDistance) > repositionThreshold;
-        
-        // Check if we're within the firing arc
         bool inFiringArc = IsInFiringArc();
 
+        Debug.Log($"[ShipMovement] {gameObject.name} reposition check - Distance valid: {!distanceInvalid}, In firing arc: {inFiringArc}");
         return distanceInvalid || !inFiringArc;
     }
 
@@ -188,6 +181,7 @@ public class ShipMovement : MonoBehaviour
         Vector3 directionToTarget = (targetShip.transform.position - transform.position).normalized;
         float angle = Vector3.Angle(transform.forward, directionToTarget);
 
+        Debug.Log($"[ShipMovement] {gameObject.name} firing arc check - Angle to target: {angle}, Required arc: {ownShip.FiringArc * 0.5f}");
         return angle <= ownShip.FiringArc * 0.5f;
     }
     
@@ -201,10 +195,13 @@ public class ShipMovement : MonoBehaviour
         
         float currentStoppingDistance = targetShip != null ? combatStoppingDistance : stoppingDistance;
 
+        Debug.Log($"[ShipMovement] {gameObject.name} moving - Distance: {distanceToTarget}, Stopping distance: {currentStoppingDistance}");
+
         if (distanceToTarget <= currentStoppingDistance)
         {
-            if (rb.linearVelocity.magnitude < stoppingThreshold)
+            if (rb.velocity.magnitude < stoppingThreshold)
             {
+                Debug.Log($"[ShipMovement] {gameObject.name} reached target - stopping");
                 StopShip();
                 return;
             }
@@ -222,13 +219,9 @@ public class ShipMovement : MonoBehaviour
         float distanceRatio = Mathf.Clamp01(distanceToTarget / currentStoppingDistance);
         Vector3 movementForce = transform.forward * currentSpeed * distanceRatio;
         
-        rb.AddForce(movementForce * (1f - waterDrag * Time.fixedDeltaTime), ForceMode.Acceleration);
+        Debug.Log($"[ShipMovement] {gameObject.name} movement - Target speed: {targetSpeed}, Current speed: {currentSpeed}, Force: {movementForce}");
         
-        if (Debug.isDebugBuild)
-        {
-            Debug.DrawLine(transform.position, targetPosition, Color.yellow);
-            Debug.DrawRay(transform.position, movementForce, Color.green);
-        }
+        rb.AddForce(movementForce * (1f - waterDrag * Time.fixedDeltaTime), ForceMode.Acceleration);
     }
 
     void RotateTowardsTarget(Vector3 targetPos)
@@ -238,13 +231,15 @@ public class ShipMovement : MonoBehaviour
         directionToTarget.Normalize();
 
         float targetAngle = Mathf.Atan2(directionToTarget.x, directionToTarget.z) * Mathf.Rad2Deg;
+        float currentAngle = transform.eulerAngles.y;
         float smoothedRotation = Mathf.SmoothDampAngle(
-            transform.eulerAngles.y,
+            currentAngle,
             targetAngle,
             ref rotationVelocity,
             rotationSmoothTime
         );
         
+        Debug.Log($"[ShipMovement] {gameObject.name} rotation - Current: {currentAngle}, Target: {targetAngle}, Smoothed: {smoothedRotation}");
         transform.rotation = Quaternion.Euler(0, smoothedRotation, 0);
     }
     
@@ -255,10 +250,10 @@ public class ShipMovement : MonoBehaviour
         currentVelocity = Vector3.zero;
         rotationVelocity = 0f;
         
-        rb.linearVelocity = Vector3.zero;
+        rb.velocity = Vector3.zero;
         rb.angularVelocity = Vector3.zero;
         
-        Debug.Log($"[ShipMovement] {gameObject.name} reached target and stopped");
+        Debug.Log($"[ShipMovement] {gameObject.name} stopped at position {transform.position}");
     }
     
     void OnDrawGizmosSelected()
@@ -279,7 +274,6 @@ public class ShipMovement : MonoBehaviour
         waterPos.y = waterLevel;
         Gizmos.DrawWireCube(waterPos, new Vector3(2f, 0.1f, 2f));
 
-        // Draw combat-related gizmos
         if (targetShip != null)
         {
             // Draw optimal combat distance
