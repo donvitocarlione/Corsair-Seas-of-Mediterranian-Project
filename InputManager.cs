@@ -48,14 +48,16 @@ public class InputManager : MonoBehaviour
 
         if (Input.GetKeyDown(KeyCode.Tab))
         {
-            Debug.Log("[InputManager] Tab pressed - selecting next ship");
             player.SelectNextShip();
         }
 
         if (Input.GetMouseButtonDown(1)) // Right click
         {
-            Debug.Log("[InputManager] Right click detected - handling movement/target input");
-            HandleMovementOrTargetInput();
+            Ship selectedShip = player.GetSelectedShip();
+            if (selectedShip != null)
+            {
+                HandleRightClickInput(selectedShip);
+            }
         }
 
         if (Input.GetKeyDown(attackKey))
@@ -92,75 +94,88 @@ public class InputManager : MonoBehaviour
         }
     }
 
-    private void HandleMovementOrTargetInput()
+    private void HandleRightClickInput(Ship selectedShip)
     {
-        Ship selectedShip = player.GetSelectedShip();
-        if (selectedShip == null)
-        {
-            Debug.LogWarning("[InputManager] No ship selected for movement/targeting");
-            return;
-        }
-
-        Debug.Log($"[InputManager] Handling input for selected ship: {selectedShip.ShipName}");
         Ray ray = mainCamera.ScreenPointToRay(Input.mousePosition);
-        Debug.Log($"[InputManager] Mouse Position: {Input.mousePosition}");
         RaycastHit hit;
 
-        // First check for target ships
+        // Check if we're clicking on a ship first
         if (Physics.Raycast(ray, out hit, maxTargetingDistance, shipLayer))
         {
-            Debug.Log($"[InputManager] Hit ship layer at point {hit.point}, object: {hit.collider.gameObject.name}, layer: {LayerMask.LayerToName(hit.collider.gameObject.layer)}");
             Ship targetShip = hit.collider.GetComponent<Ship>();
             if (targetShip != null && !targetShip.IsSinking && targetShip != selectedShip)
             {
-                HandleTargetSelection(selectedShip, targetShip, hit.point);
+                HandleCombatInput(selectedShip, targetShip, hit.point);
                 return;
             }
         }
 
-        // If no ship hit, handle movement
+        // If no valid ship target, handle movement
+        HandleMovementInput(selectedShip, ray);
+    }
+
+    private void HandleCombatInput(Ship selectedShip, Ship targetShip, Vector3 targetPoint)
+    {
+        ShipMovement movement = selectedShip.GetComponent<ShipMovement>();
+        if (movement == null) return;
+
+        // Check if ships are from different factions
+        if (selectedShip.ShipOwner != null && targetShip.ShipOwner != null && 
+            selectedShip.ShipOwner.Faction == targetShip.ShipOwner.Faction)
+        {
+            // For friendly ships, just move to their position
+            movement.SetTargetPosition(targetPoint);
+            Debug.Log($"[InputManager] Moving to friendly ship {targetShip.ShipName}'s position");
+            return;
+        }
+
+        // Set combat target
+        movement.SetTargetPosition(targetPoint, targetShip);
+        Debug.Log($"[InputManager] {selectedShip.ShipName} targeting enemy ship {targetShip.ShipName}");
+    }
+
+    private void HandleMovementInput(Ship selectedShip, Ray ray)
+    {
+        ShipMovement movement = selectedShip.GetComponent<ShipMovement>();
+        if (movement == null) return;
+
+        // Only override combat movement if explicitly clicking on water/terrain
+        RaycastHit hit;
+        Vector3 targetPoint;
+
         if (Physics.Raycast(ray, out hit, Mathf.Infinity, surfaceLayer))
         {
-            Debug.Log($"[InputManager] Hit surface at point {hit.point}, object: {hit.collider.gameObject.name}");
-            SetShipTargetPosition(selectedShip, hit.point);
+            targetPoint = hit.point;
         }
         else
         {
             // Project to water plane if no surface hit
             Plane waterPlane = new Plane(Vector3.up, new Vector3(0, waterLevel, 0));
             float enter;
-            if (waterPlane.Raycast(ray, out enter))
+            if (!waterPlane.Raycast(ray, out enter))
             {
-                Vector3 hitPoint = ray.GetPoint(enter);
-                Debug.Log($"[InputManager] Projected to water plane at point {hitPoint}");
-                SetShipTargetPosition(selectedShip, hitPoint);
+                return;
             }
-            else
-            {
-                Debug.LogWarning("[InputManager] Could not determine target position - ray did not intersect water plane");
-            }
-        }
-    }
-
-    private void HandleTargetSelection(Ship attacker, Ship target, Vector3 targetPoint)
-    {
-        if (attacker.ShipOwner != null && target.ShipOwner != null && 
-            attacker.ShipOwner.Faction == target.ShipOwner.Faction)
-        {
-            Debug.Log($"[InputManager] Cannot target friendly ship {target.ShipName} (same faction)");
-            return;
+            targetPoint = ray.GetPoint(enter);
         }
 
-        ShipMovement movement = attacker.GetComponent<ShipMovement>();
-        if (movement != null)
+        // If ship is in combat, check if we should allow movement
+        if (movement.IsInCombat())
         {
-            movement.SetTargetPosition(targetPoint, target);
-            Debug.Log($"[InputManager] {attacker.ShipName} targeting {target.ShipName} at position {targetPoint}");
+            Ship targetShip = movement.GetTargetShip();
+            if (targetShip != null && !targetShip.IsSinking)
+            {
+                float distanceToTarget = Vector3.Distance(targetPoint, targetShip.transform.position);
+                if (distanceToTarget > maxTargetingDistance * 1.5f)
+                {
+                    // If moving far from combat target, clear combat
+                    movement.ClearCombatTarget();
+                }
+            }
         }
-        else
-        {
-            Debug.LogError($"[InputManager] {attacker.ShipName} has no ShipMovement component!");
-        }
+
+        movement.SetTargetPosition(targetPoint);
+        Debug.Log($"[InputManager] Set movement target for {selectedShip.name} to {targetPoint}");
     }
 
     private void HandleAttackInput()
@@ -176,12 +191,8 @@ public class InputManager : MonoBehaviour
 
         if (currentTarget != null && selectedShip.CanFire)
         {
-            Debug.Log($"[InputManager] {selectedShip.ShipName} attempting to fire at {currentTarget.ShipName}");
+            Debug.Log($"[InputManager] {selectedShip.ShipName} firing at {currentTarget.ShipName}");
             selectedShip.Fire(currentTarget);
-        }
-        else
-        {
-            Debug.Log($"[InputManager] Cannot fire: Target={currentTarget != null}, CanFire={selectedShip.CanFire}");
         }
     }
 
@@ -190,31 +201,16 @@ public class InputManager : MonoBehaviour
         Ship selectedShip = player.GetSelectedShip();
         if (selectedShip == null) return;
 
+        ShipMovement movement = selectedShip.GetComponent<ShipMovement>();
+        if (movement != null)
+        {
+            movement.ClearCombatTarget();
+        }
+
         if (CombatSystem.Instance != null)
         {
             CombatSystem.Instance.ClearCombatTarget(selectedShip);
             Debug.Log($"[InputManager] Cleared combat target for {selectedShip.ShipName}");
-        }
-    }
-
-    private void SetShipTargetPosition(Ship ship, Vector3 position)
-    {
-        ShipMovement movement = ship.GetComponent<ShipMovement>();
-        if (movement != null)
-        {
-            position.y = waterLevel;
-            movement.SetTargetPosition(position);
-            Debug.Log($"[InputManager] Set target position for {ship.name} to {position}");
-
-            // Clear any existing combat target
-            if (CombatSystem.Instance != null)
-            {
-                CombatSystem.Instance.ClearCombatTarget(ship);
-            }
-        }
-        else
-        {
-            Debug.LogError($"[InputManager] Selected ship {ship.name} has no ShipMovement component!");
         }
     }
 }
