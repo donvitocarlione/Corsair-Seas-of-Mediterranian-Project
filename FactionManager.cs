@@ -1,106 +1,89 @@
 using UnityEngine;
 using System.Collections.Generic;
-using System;
 
-[AddComponentMenu("Game/Faction Manager")]
 public class FactionManager : MonoBehaviour
 {
-    [SerializeField] private List<FactionShipData> factionConfigurations = new List<FactionShipData>();
-
     private static FactionManager instance;
-    public static FactionManager Instance
-    {
-        get
-        {
-            if (instance == null)
-            {
-                instance = FindAnyObjectByType<FactionManager>();
-                if (instance == null)
-                {
-                    Debug.LogError("No FactionManager found in scene!");
-                }
-            }
-            return instance;
-        }
-    }
+    public static FactionManager Instance => instance;
 
-    private Dictionary<FactionType, FactionDefinition> factions = new();
+    private Dictionary<FactionType, FactionDefinition> factions = new Dictionary<FactionType, FactionDefinition>();
     
+    public const float MIN_RELATION = -100f;
+    public const float MAX_RELATION = 100f;
+
     // Events
-    public event Action<FactionType, Ship> OnShipRegistered;
-    public event Action<FactionType, Ship> OnShipUnregistered;
-    public event Action<FactionType, FactionType, float> OnRelationChanged;
-    public event Action<FactionType, int> OnInfluenceChanged;
-    public event Action<FactionType, Port> OnPortCaptured;
+    public delegate void OnShipUnregisteredDelegate(Ship ship);
+    public delegate void OnRelationChangedDelegate(FactionType factionA, FactionType factionB, float newValue);
+    public delegate void OnInfluenceChangedDelegate(FactionType faction, float newValue);
+    public delegate void OnPortCapturedDelegate(Port port, FactionType oldOwner, FactionType newOwner);
+    public delegate void OnShipRegisteredDelegate(Ship ship);
 
-    // Constants
-    private const float MIN_RELATION = 0f;
-    private const float MAX_RELATION = 100f;
-    private const float NEUTRAL_RELATION = 50f;
-    private const float WAR_THRESHOLD = 25f;
-    private const float ALLY_THRESHOLD = 75f;
-    private const float TRADE_RELATION_MULTIPLIER = 0.1f;
-
-    public List<FactionShipData> GetFactionConfigurations() => factionConfigurations;
+    public event OnShipUnregisteredDelegate OnShipUnregistered;
+    public event OnRelationChangedDelegate OnRelationChanged;
+    public event OnInfluenceChangedDelegate OnInfluenceChanged;
+    public event OnPortCapturedDelegate OnPortCaptured;
+    public event OnShipRegisteredDelegate OnShipRegistered;
 
     private void Awake()
     {
-        ValidateSingleton();
-        InitializeFactions();
-    }
-
-    private void Start()
-    {
-        // Initialize ship spawning
-        var shipSpawner = FindAnyObjectByType<ShipSpawner>();
-        var player = FindAnyObjectByType<Player>();
-
-        if (shipSpawner != null)
+        if (instance == null)
         {
-            var factionInitializer = gameObject.GetComponent<FactionInitializer>();
-            if (factionInitializer == null)
-            {
-                factionInitializer = gameObject.AddComponent<FactionInitializer>();
-            }
-            factionInitializer.Initialize(shipSpawner, this, player, factionConfigurations);
-            factionInitializer.InitializeAllFactions();
+            instance = this;
+            DontDestroyOnLoad(gameObject);
+            InitializeFactions();
         }
         else
         {
-            Debug.LogError("[FactionManager] ShipSpawner not found in scene!");
+            Destroy(gameObject);
         }
     }
 
-    private void ValidateSingleton()
+    public void InitializeFactions()
     {
-        if (instance != null && instance != this)
+        factions.Clear();
+        foreach (FactionType faction in System.Enum.GetValues(typeof(FactionType)))
         {
-            Debug.LogWarning($"Multiple FactionManager instances found! Destroying duplicate on {gameObject.name}");
-            Destroy(this);
+            InitializeDefaultFaction(faction);
+        }
+    }
+
+    private void InitializeDefaultFaction(FactionType faction)
+    {
+        if (faction == FactionType.None) return;
+        
+        string factionName = faction.ToString();
+        factions[faction] = new FactionDefinition(faction, factionName);
+        OnInfluenceChanged?.Invoke(faction, 100); // Set default influence to 100
+        Debug.Log($"[FactionManager] Initialized default faction: {faction} with name {factionName}");
+    }
+
+    public FactionDefinition GetFactionData(FactionType factionType)
+    {
+        if (factions.TryGetValue(factionType, out FactionDefinition faction))
+        {
+            return faction;
+        }
+        Debug.LogWarning($"[FactionManager] Faction not found: {factionType}");
+        return null;
+    }
+
+    public void UpdateFactionRelation(FactionType factionA, FactionType factionB, float value)
+    {
+        if (factionA == FactionType.None || factionB == FactionType.None)
+        {
+            Debug.LogWarning($"[FactionManager] Cannot update relation to none faction");
             return;
         }
-        instance = this;
-    }
-
-    private void InitializeFactions()
-    {
-        foreach (FactionType faction in Enum.GetValues(typeof(FactionType)))
+        if (!factions.ContainsKey(factionA) || !factions.ContainsKey(factionB))
         {
-            if (!factions.ContainsKey(faction))
-            {
-                InitializeDefaultFaction(faction);
-            }
+            Debug.LogWarning($"[FactionManager] Cannot update relation to non existing faction: {factionA} or {factionB}");
+            return;
         }
 
-        // Validate faction configurations
-        foreach (var config in factionConfigurations)
-        {
-            if (!config.Validate())
-            {
-                Debug.LogError($"[FactionManager] Invalid configuration for faction {config.Faction}");
-            }
-        }
-    }
+        factions[factionA].SetRelation(factionB, Mathf.Clamp(value, MIN_RELATION, MAX_RELATION));
+        factions[factionB].SetRelation(factionA, Mathf.Clamp(value, MIN_RELATION, MAX_RELATION));
 
-    // ... [rest of the existing FactionManager code remains the same]
+        OnRelationChanged?.Invoke(factionA, factionB, value);
+        Debug.Log($"[FactionManager] Relation updated between {factionA} and {factionB} to {value}");
+    }
 }
