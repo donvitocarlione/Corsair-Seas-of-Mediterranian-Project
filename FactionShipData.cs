@@ -10,6 +10,7 @@ public class FactionShipData
     
     [Header("Ship Settings")]
     public List<GameObject> ShipPrefabs = new List<GameObject>();
+    public int InitialShipCount = 3;
     
     [Header("Spawn Settings")]
     public float SpawnHeightAboveWater = 5f;
@@ -18,6 +19,15 @@ public class FactionShipData
     
     [Header("Spawn Area Settings")]
     public float SpawnAreaRadius = 200f;
+
+    public GameObject GetRandomShipPrefab()
+    {
+        if (ShipPrefabs == null || ShipPrefabs.Count == 0)
+        {
+            return null;
+        }
+        return ShipPrefabs[Random.Range(0, ShipPrefabs.Count)];
+    }
 
     public bool Validate()
     {

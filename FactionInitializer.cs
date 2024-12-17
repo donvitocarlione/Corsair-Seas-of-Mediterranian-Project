@@ -81,7 +81,11 @@ public class FactionInitializer : MonoBehaviour
         {
             for (int i = 0; i < data.InitialShipCount; i++)
             {
-                shipSpawner.SpawnShip(data.Faction, data.ShipPrefab);
+                GameObject shipPrefab = data.GetRandomShipPrefab();
+                if (shipPrefab != null)
+                {
+                    shipSpawner.SpawnShip(data.Faction, shipPrefab);
+                }
             }
             Debug.Log($"[FactionInitializer] Spawned {data.InitialShipCount} ships for {data.Faction}");
         }
