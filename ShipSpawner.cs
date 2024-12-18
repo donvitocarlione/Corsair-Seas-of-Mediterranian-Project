@@ -35,21 +35,21 @@ public class ShipSpawner : MonoBehaviour
         }
     }
   
-    public Ship SpawnShip(FactionType faction, GameObject prefab, Vector3 position, Quaternion rotation)
+    public Ship SpawnShip(Faction faction, GameObject prefab, Vector3 position, Quaternion rotation)
     {
         GameObject shipObj = Instantiate(prefab, position, rotation, shipParent);
         Ship ship = shipObj.GetComponent<Ship>();
         return SetupShip(ship, faction);
     }
 
-    public Ship SpawnShip(FactionType faction, Vector3 position, Quaternion rotation)
+    public Ship SpawnShip(Faction faction, Vector3 position, Quaternion rotation)
     {
         GameObject shipObj = Instantiate(shipPrefab, position, rotation, shipParent);
         Ship ship = shipObj.GetComponent<Ship>();
         return SetupShip(ship, faction);
     }
     
-    private Ship SetupShip(Ship ship, FactionType faction)
+    private Ship SetupShip(Ship ship, Faction faction)
     {
         if (ship == null)
         {
@@ -58,7 +58,7 @@ public class ShipSpawner : MonoBehaviour
         }
     
         // Set up AI controller for non-player ships
-        if (faction != FactionType.Player)
+        if (faction != FactionManager.Instance.PlayerFaction)
         {
             var aiController = ship.gameObject.AddComponent<AIShipController>();
             aiController.Initialize(ship);
@@ -66,11 +66,12 @@ public class ShipSpawner : MonoBehaviour
         }
     
         // Set faction
-        Pirate pirate = ship.gameObject.GetComponent<Pirate>();
-        if (pirate != null)
+        var factionMember = ship.gameObject.GetComponent<FactionMember>();
+        if (factionMember == null)
         {
-            pirate.SetFaction(faction);
+            factionMember = ship.gameObject.AddComponent<FactionMember>();
         }
+        factionMember.SetFaction(faction);
 
         // Register the ship if registry exists
         if (shipRegistry != null)
@@ -80,13 +81,13 @@ public class ShipSpawner : MonoBehaviour
     
         if (debugMode)
         {
-            Debug.Log($"[ShipSpawner] Spawned ship of faction {faction} at {ship.transform.position}");
+            Debug.Log($"[ShipSpawner] Spawned ship of faction {faction.FactionName} at {ship.transform.position}");
         }
     
         return ship;
     }
 
-    public Ship SpawnShipAtRandomPoint(FactionType faction)
+    public Ship SpawnShipAtRandomPoint(Faction faction)
     {
         Transform spawnPoint = spawnPoints[Random.Range(0, spawnPoints.Length)];
         return SpawnShip(faction, shipPrefab, spawnPoint.position, spawnPoint.rotation);
