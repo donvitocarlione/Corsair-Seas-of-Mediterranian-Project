@@ -8,7 +8,7 @@ public class FactionUIManager : MonoBehaviour
     [System.Serializable]
     private class FactionUI
     {
-        public FactionType faction;
+        public Faction faction;
         public Image flagImage;
         public TextMeshProUGUI nameText;
         public TextMeshProUGUI influenceText;
@@ -24,8 +24,8 @@ public class FactionUIManager : MonoBehaviour
     {
         if (FactionManager.Instance != null)
         {
-            FactionManager.Instance.OnRelationChanged += UpdateRelationshipUI;
-            FactionManager.Instance.OnInfluenceChanged += UpdateInfluenceUI;
+            FactionManager.Instance.OnRelationshipChanged += UpdateRelationshipUI;
+            FactionManager.Instance.OnInfluenceUpdated += UpdateInfluenceUI;
             InitializeUI();
         }
     }
@@ -34,36 +34,51 @@ public class FactionUIManager : MonoBehaviour
     {
         foreach (var ui in factionUIs)
         {
-            var factionData = FactionManager.Instance.GetFactionData(ui.faction);
-            if (factionData != null)
+            if (ui.faction != null)
             {
-                ui.nameText.text = factionData.Name;
-                ui.influenceText.text = $"Influence: {factionData.Influence}%";
-                ui.relationshipSlider.value = 50f; // Default neutral value
-                UpdateSliderColor(ui.relationshipSlider, 50f);
+                ui.nameText.text = ui.faction.FactionName;
+                UpdateInfluenceText(ui, ui.faction.CurrentInfluence);
+                
+                // Get initial relationship values
+                float relationshipValue = FactionManager.Instance.GetRelationship(ui.faction);
+                ui.relationshipSlider.value = relationshipValue;
+                UpdateSliderColor(ui.relationshipSlider, relationshipValue);
+
+                // Set faction flag if available
+                if (ui.faction.FactionFlag != null && ui.flagImage != null)
+                {
+                    ui.flagImage.sprite = ui.faction.FactionFlag;
+                }
             }
         }
     }
 
-    private void UpdateRelationshipUI(FactionType faction1, FactionType faction2, float newValue)
+    private void UpdateRelationshipUI(Faction faction1, Faction faction2, float newValue)
     {
         foreach (var ui in factionUIs)
         {
-            if (ui.faction == faction2) // Update UI for the other faction
+            // Update UI for both factions involved
+            if (ui.faction == faction1 || ui.faction == faction2)
             {
-                ui.relationshipSlider.value = newValue;
-                UpdateSliderColor(ui.relationshipSlider, newValue);
+                float relationshipValue = FactionManager.Instance.GetRelationship(ui.faction);
+                ui.relationshipSlider.value = relationshipValue;
+                UpdateSliderColor(ui.relationshipSlider, relationshipValue);
             }
         }
     }
 
-    private void UpdateInfluenceUI(FactionType faction, int newInfluence)
+    private void UpdateInfluenceUI(Faction faction, float newInfluence)
     {
         var ui = factionUIs.Find(x => x.faction == faction);
         if (ui != null)
         {
-            ui.influenceText.text = $"Influence: {newInfluence}%";
+            UpdateInfluenceText(ui, newInfluence);
         }
+    }
+
+    private void UpdateInfluenceText(FactionUI ui, float influence)
+    {
+        ui.influenceText.text = $"Influence: {influence:F1}%";
     }
 
     private void UpdateSliderColor(Slider slider, float value)
@@ -87,8 +102,8 @@ public class FactionUIManager : MonoBehaviour
     {
         if (FactionManager.Instance != null)
         {
-            FactionManager.Instance.OnRelationChanged -= UpdateRelationshipUI;
-            FactionManager.Instance.OnInfluenceChanged -= UpdateInfluenceUI;
+            FactionManager.Instance.OnRelationshipChanged -= UpdateRelationshipUI;
+            FactionManager.Instance.OnInfluenceUpdated -= UpdateInfluenceUI;
         }
     }
 }
