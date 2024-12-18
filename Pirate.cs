@@ -1,13 +1,22 @@
 using UnityEngine;
+using System;
 
 public class Pirate : MonoBehaviour
 {
-    public FactionType Faction { get; protected set; }
+    public FactionType CurrentFaction { get; private set; } = FactionType.None;
     
-    public virtual void SetFaction(FactionType faction)
+    public event Action<FactionType, FactionType> OnFactionChanged;
+    
+    private void SetFaction(FactionType newFaction)
     {
-        Faction = faction;
+        var oldFaction = CurrentFaction;
+        CurrentFaction = newFaction;
+        OnFactionChanged?.Invoke(oldFaction, newFaction);
     }
-
-    // Add other pirate-specific functionality here
+    
+    // Internal method to be called only by FactionManager
+    internal void InternalSetFaction(FactionType faction)
+    {
+        SetFaction(faction);
+    }
 }
