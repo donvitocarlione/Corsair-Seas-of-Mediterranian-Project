@@ -6,6 +6,18 @@ public class ShipRegistry : MonoBehaviour
     [SerializeField] private bool debugPositions = false;
     private HashSet<Vector3> occupiedPositions = new HashSet<Vector3>();
     private HashSet<Ship> registeredShips = new HashSet<Ship>();
+    private Dictionary<Faction, HashSet<Ship>> factionShips = new Dictionary<Faction, HashSet<Ship>>();
+
+    private void Start()
+    {
+        if (FactionManager.Instance != null)
+        {
+            foreach (var faction in FactionManager.Instance.GetAllFactions())
+            {
+                factionShips[faction] = new HashSet<Ship>();
+            }
+        }
+    }
 
     public void RegisterShip(Ship ship)
     {
@@ -18,13 +30,20 @@ public class ShipRegistry : MonoBehaviour
         registeredShips.Add(ship);
         RegisterShipPosition(ship.transform.position);
 
-        // Register with FactionManager if available
-        if (FactionManager.Instance != null)
+        var shipFaction = ship.GetComponent<FactionMember>()?.Faction;
+        if (shipFaction != null)
         {
-            FactionManager.Instance.RegisterShip(ship);
+            if (!factionShips.ContainsKey(shipFaction))
+            {
+                factionShips[shipFaction] = new HashSet<Ship>();
+            }
+            factionShips[shipFaction].Add(ship);
+
+            // Notify FactionManager
+            FactionManager.Instance?.OnShipRegistered(ship, shipFaction);
         }
 
-        Debug.Log($"[ShipRegistry] Registered ship {ship.ShipName}");
+        Debug.Log($"[ShipRegistry] Registered ship {ship.ShipName} with faction {(shipFaction?.FactionName ?? "None")}");
     }
 
     public void RegisterShipPosition(Vector3 position)
@@ -49,14 +68,17 @@ public class ShipRegistry : MonoBehaviour
     {
         if (ship != null)
         {
+            var shipFaction = ship.GetComponent<FactionMember>()?.Faction;
             Debug.Log($"[ShipRegistry] Ship {ship.ShipName} destroyed, removing from registry");
+            
             UnregisterShipPosition(ship.transform.position);
             registeredShips.Remove(ship);
 
-            // Notify FactionManager if available
-            if (FactionManager.Instance != null)
+            if (shipFaction != null && factionShips.ContainsKey(shipFaction))
             {
-                FactionManager.Instance.UnregisterShip(ship);
+                factionShips[shipFaction].Remove(ship);
+                // Notify FactionManager
+                FactionManager.Instance?.OnShipDestroyed(ship, shipFaction);
             }
 
             Destroy(ship.gameObject, 2f); // Delayed destruction for effects
@@ -89,18 +111,28 @@ public class ShipRegistry : MonoBehaviour
         return true;
     }
 
-    public void Clear()
+    public IReadOnlyCollection<Ship> GetShipsForFaction(Faction faction)
     {
-        occupiedPositions.Clear();
-        registeredShips.Clear();
-        if (debugPositions)
+        if (faction != null && factionShips.TryGetValue(faction, out var ships))
         {
-            Debug.Log("[ShipRegistry] Cleared all registered positions and ships");
+            return ships;
         }
+        return new HashSet<Ship>();
     }
 
     public IReadOnlyCollection<Ship> GetAllShips()
     {
         return registeredShips;
+    }
+
+    public void Clear()
+    {
+        occupiedPositions.Clear();
+        registeredShips.Clear();
+        factionShips.Clear();
+        if (debugPositions)
+        {
+            Debug.Log("[ShipRegistry] Cleared all registered positions and ships");
+        }
     }
 }
