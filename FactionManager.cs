@@ -1,108 +1,138 @@
 using UnityEngine;
+using System;
 using System.Collections.Generic;
 
 public class FactionManager : MonoBehaviour
 {
     private static FactionManager instance;
     public static FactionManager Instance => instance;
-
-    private Dictionary<FactionType, FactionDefinition> factions = new Dictionary<FactionType, FactionDefinition>();
     
-    public const float MIN_RELATION = -100f;
-    public const float MAX_RELATION = 100f;
-
+    // Core data storage
+    private Dictionary<FactionType, FactionData> factionData;
+    
     // Events
-    public delegate void OnShipUnregisteredDelegate(Ship ship);
-    public delegate void OnRelationChangedDelegate(FactionType factionA, FactionType factionB, float newValue);
-    public delegate void OnInfluenceChangedDelegate(FactionType faction, int newValue);
-    public delegate void OnPortCapturedDelegate(Port port, FactionType oldOwner, FactionType newOwner);
-    public delegate void OnShipRegisteredDelegate(Ship ship);
-
-    public event OnShipUnregisteredDelegate OnShipUnregistered;
-    public event OnRelationChangedDelegate OnRelationChanged;
-    public event OnInfluenceChangedDelegate OnInfluenceChanged;
-    public event OnPortCapturedDelegate OnPortCaptured;
-    public event OnShipRegisteredDelegate OnShipRegistered;
-
+    public event Action<FactionType, FactionType, float> OnRelationshipChanged;
+    public event Action<Pirate, FactionType, FactionType> OnMemberFactionChanged;
+    public event Action<Port, FactionType, FactionType> OnPortOwnershipChanged;
+    public event Action<FactionType, float> OnInfluenceChanged;
+    
     private void Awake()
     {
         if (instance == null)
         {
             instance = this;
             DontDestroyOnLoad(gameObject);
-            InitializeFactions();
+            InitializeFactionSystem();
         }
         else
         {
             Destroy(gameObject);
         }
     }
-
-    public void InitializeFactions()
+    
+    private void InitializeFactionSystem()
     {
-        factions.Clear();
-        foreach (FactionType faction in System.Enum.GetValues(typeof(FactionType)))
-        {
-            InitializeDefaultFaction(faction);
-        }
-    }
-
-    private void InitializeDefaultFaction(FactionType faction)
-    {
-        if (faction == FactionType.None) return;
+        factionData = new Dictionary<FactionType, FactionData>();
         
-        string factionName = faction.ToString();
-        factions[faction] = new FactionDefinition(faction, factionName);
-        OnInfluenceChanged?.Invoke(faction, 100); // Set default influence to 100
-        Debug.Log($"[FactionManager] Initialized default faction: {faction} with name {factionName}");
-    }
-
-    public FactionDefinition GetFactionData(FactionType factionType)
-    {
-        if (factions.TryGetValue(factionType, out FactionDefinition faction))
+        // Initialize all factions except None
+        foreach (FactionType factionType in Enum.GetValues(typeof(FactionType)))
         {
-            return faction;
+            if (factionType != FactionType.None)
+            {
+                CreateFaction(factionType, factionType.ToString());
+            }
         }
-        Debug.LogWarning($"[FactionManager] Faction not found: {factionType}");
-        return null;
     }
-
-    public void UpdateFactionRelation(FactionType factionA, FactionType factionB, float value)
+    
+    private void CreateFaction(FactionType type, string name)
     {
-        if (factionA == FactionType.None || factionB == FactionType.None)
+        if (factionData.ContainsKey(type))
         {
-            Debug.LogWarning($"[FactionManager] Cannot update relation to none faction");
+            Debug.LogWarning($"Faction {type} already exists!");
             return;
         }
-        if (!factions.ContainsKey(factionA) || !factions.ContainsKey(factionB))
+        
+        try
         {
-            Debug.LogWarning($"[FactionManager] Cannot update relation to non existing faction: {factionA} or {factionB}");
-            return;
+            var faction = new FactionData(type, name);
+            factionData[type] = faction;
         }
-
-        factions[factionA].SetRelation(factionB, Mathf.Clamp(value, MIN_RELATION, MAX_RELATION));
-        factions[factionB].SetRelation(factionA, Mathf.Clamp(value, MIN_RELATION, MAX_RELATION));
-
-        OnRelationChanged?.Invoke(factionA, factionB, value);
-        Debug.Log($"[FactionManager] Relation updated between {factionA} and {factionB} to {value}");
+        catch (ArgumentException e)
+        {
+            Debug.LogError($"Failed to create faction {type}: {e.Message}");
+        }
     }
-
-    // Add methods to invoke the unused events
-    public void RegisterShip(Ship ship)
+    
+    // Relationship Management
+    public float GetRelationship(FactionType a, FactionType b)
     {
-        OnShipRegistered?.Invoke(ship);
-        Debug.Log($"[FactionManager] Ship registered: {ship.ShipName}");
+        if (!factionData.ContainsKey(a) || !factionData.ContainsKey(b))
+        {
+            throw new ArgumentException(FactionConstants.ERROR_INVALID_FACTION);
+        }
+        
+        return factionData[a].GetRelationship(b);
     }
-
-    public void UnregisterShip(Ship ship)
+    
+    public void SetRelationship(FactionType a, FactionType b, float value)
     {
-        OnShipUnregistered?.Invoke(ship);
-        Debug.Log($"[FactionManager] Ship unregistered: {ship.ShipName}");
+        if (!factionData.ContainsKey(a) || !factionData.ContainsKey(b))
+        {
+            throw new ArgumentException(FactionConstants.ERROR_INVALID_FACTION);
+        }
+        
+        // Update both factions' relationship values
+        factionData[a].SetRelationship(b, value);
+        factionData[b].SetRelationship(a, value);
+        
+        OnRelationshipChanged?.Invoke(a, b, value);
     }
-
-    public void NotifyPortCaptured(Port port, FactionType oldOwner, FactionType newOwner)
+    
+    // Member Management
+    public void AddMemberToFaction(Pirate pirate, FactionType faction)
     {
-        OnPortCaptured?.Invoke(port, oldOwner, newOwner);
-        Debug.Log($"[FactionManager] Port captured from {oldOwner} by {newOwner}");
+        if (!factionData.ContainsKey(faction))
+        {
+            throw new ArgumentException(FactionConstants.ERROR_INVALID_FACTION);
+        }
+        
+        var oldFaction = pirate.CurrentFaction;
+        
+        // Remove from old faction if necessary
+        if (oldFaction != FactionType.None && factionData.ContainsKey(oldFaction))
+        {
+            factionData[oldFaction].RemoveMember(pirate);
+        }
+        
+        // Add to new faction
+        factionData[faction].AddMember(pirate);
+        pirate.InternalSetFaction(faction);
+        
+        OnMemberFactionChanged?.Invoke(pirate, oldFaction, faction);
+    }
+    
+    public void RemoveMemberFromFaction(Pirate pirate, FactionType faction)
+    {
+        if (!factionData.ContainsKey(faction))
+        {
+            throw new ArgumentException(FactionConstants.ERROR_INVALID_FACTION);
+        }
+        
+        factionData[faction].RemoveMember(pirate);
+        pirate.InternalSetFaction(FactionType.None);
+        
+        OnMemberFactionChanged?.Invoke(pirate, faction, FactionType.None);
+    }
+    
+    // Influence Management
+    public void SetFactionInfluence(FactionType faction, float value)
+    {
+        if (!factionData.ContainsKey(faction))
+        {
+            throw new ArgumentException(FactionConstants.ERROR_INVALID_FACTION);
+        }
+        
+        factionData[faction].SetInfluence(value);
+        OnInfluenceChanged?.Invoke(faction, value);
     }
 }
