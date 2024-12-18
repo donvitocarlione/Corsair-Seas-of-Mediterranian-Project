@@ -3,109 +3,140 @@ using System.Collections.Generic;
 
 public class FactionInitializer : MonoBehaviour
 {
-    private ShipSpawner shipSpawner;
-    private FactionManager factionManager;
-    private Player playerInstance;
-    private List<FactionShipData> factionData;
-
-    public void Initialize(ShipSpawner spawner, FactionManager manager, Player player, List<FactionShipData> data)
+    [System.Serializable]
+    public class InitialFactionData
     {
-        shipSpawner = spawner;
-        factionManager = manager;
-        playerInstance = player;
-        factionData = data;
-        
-        Debug.Log("[FactionInitializer] Components initialized");
+        public Faction faction;
+        public int initialShipCount = 3;
+        public List<GameObject> shipPrefabs;
+        public Dictionary<Faction, float> initialRelations;
+
+        public GameObject GetRandomShipPrefab()
+        {
+            if (shipPrefabs == null || shipPrefabs.Count == 0) return null;
+            return shipPrefabs[Random.Range(0, shipPrefabs.Count)];
+        }
     }
 
-    public void InitializePlayerFaction(FactionType faction)
+    [SerializeField] private List<InitialFactionData> factionData;
+    [SerializeField] private float defaultNeutralRelation = 50f;
+    [SerializeField] private bool debugMode = false;
+
+    private ShipSpawner shipSpawner;
+
+    public void Initialize(ShipSpawner spawner)
     {
-        if (factionManager != null)
+        shipSpawner = spawner;
+        if (debugMode)
         {
-            // Set initial player faction relations
-            foreach (FactionType otherFaction in System.Enum.GetValues(typeof(FactionType)))
-            {
-                if (otherFaction != faction && otherFaction != FactionType.None)
-                {
-                    // Default to neutral relations (50)
-                    factionManager.UpdateFactionRelation(faction, otherFaction, 50f);
-                }
-            }
-            Debug.Log($"[FactionInitializer] Player faction {faction} initialized");
+            Debug.Log("[FactionInitializer] Components initialized");
         }
     }
 
     public void InitializeAllFactions()
     {
-        if (factionManager == null || shipSpawner == null)
+        if (FactionManager.Instance == null || shipSpawner == null)
         {
             Debug.LogError("[FactionInitializer] Cannot initialize factions - missing components");
             return;
         }
 
-        // Set up initial faction relations
-        SetupInitialRelations();
+        // First, register all factions with FactionManager
+        RegisterFactions();
 
-        // Spawn initial ships for each faction
+        // Then set up initial relations and spawn ships
         foreach (var data in factionData)
         {
-            if (data.Faction != FactionType.None)
+            if (data.faction != null)
             {
+                SetupFactionRelations(data);
                 SpawnInitialShips(data);
             }
         }
 
-        Debug.Log("[FactionInitializer] All factions initialized");
-    }
-
-    private void SetupInitialRelations()
-    {
-        // Set up historical rivalries and alliances
-        
-        // Ottoman-Venetian War
-        factionManager.UpdateFactionRelation(FactionType.Ottomans, FactionType.Venetians, 10f);
-        
-        // Pirates are generally hostile
-        factionManager.UpdateFactionRelation(FactionType.Pirates, FactionType.Merchants, 20f);
-        factionManager.UpdateFactionRelation(FactionType.Pirates, FactionType.RoyalNavy, 15f);
-        
-        // Merchants are protected by Royal Navy
-        factionManager.UpdateFactionRelation(FactionType.Merchants, FactionType.RoyalNavy, 80f);
-
-        Debug.Log("[FactionInitializer] Initial faction relations set");
-    }
-
-    private void SpawnInitialShips(FactionShipData data)
-    {
-        if (shipSpawner != null && data != null)
+        if (debugMode)
         {
-            for (int i = 0; i < data.InitialShipCount; i++)
+            Debug.Log("[FactionInitializer] All factions initialized");
+        }
+    }
+
+    private void RegisterFactions()
+    {
+        foreach (var data in factionData)
+        {
+            if (data.faction != null)
+            {
+                FactionManager.Instance.RegisterFaction(data.faction);
+                if (debugMode)
+                {
+                    Debug.Log($"[FactionInitializer] Registered faction: {data.faction.FactionName}");
+                }
+            }
+        }
+    }
+
+    private void SetupFactionRelations(InitialFactionData data)
+    {
+        if (data.initialRelations != null)
+        {
+            foreach (var relation in data.initialRelations)
+            {
+                if (relation.Key != null)
+                {
+                    FactionManager.Instance.SetRelationship(data.faction, relation.Key, relation.Value);
+                    if (debugMode)
+                    {
+                        Debug.Log($"[FactionInitializer] Set relationship between {data.faction.FactionName} and {relation.Key.FactionName} to {relation.Value}");
+                    }
+                }
+            }
+        }
+        else
+        {
+            // Set default neutral relations with all other factions
+            foreach (var otherData in factionData)
+            {
+                if (otherData.faction != null && otherData.faction != data.faction)
+                {
+                    FactionManager.Instance.SetRelationship(data.faction, otherData.faction, defaultNeutralRelation);
+                }
+            }
+        }
+    }
+
+    private void SpawnInitialShips(InitialFactionData data)
+    {
+        if (shipSpawner != null && data.faction != null)
+        {
+            for (int i = 0; i < data.initialShipCount; i++)
             {
                 GameObject shipPrefab = data.GetRandomShipPrefab();
                 if (shipPrefab != null)
                 {
-                    // Get a random spawn point position and rotation
                     Ship ship = shipSpawner.SpawnShip(
-                        data.Faction,
+                        data.faction,
                         shipPrefab,
                         GetRandomSpawnPosition(),
                         Quaternion.Euler(0, Random.Range(0f, 360f), 0)
                     );
                     
-                    if (ship != null)
+                    if (ship != null && debugMode)
                     {
-                        Debug.Log($"[FactionInitializer] Successfully spawned {ship.ShipName} for {data.Faction}");
+                        Debug.Log($"[FactionInitializer] Successfully spawned {ship.ShipName} for {data.faction.FactionName}");
                     }
                 }
             }
-            Debug.Log($"[FactionInitializer] Spawned {data.InitialShipCount} ships for {data.Faction}");
+
+            if (debugMode)
+            {
+                Debug.Log($"[FactionInitializer] Spawned {data.initialShipCount} ships for {data.faction.FactionName}");
+            }
         }
     }
 
     private Vector3 GetRandomSpawnPosition()
     {
-        // For now, just return a random position in a reasonable range
-        float spawnRadius = 100f; // Adjust this value based on your game's scale
+        float spawnRadius = 100f;
         Vector2 randomCircle = Random.insideUnitCircle * spawnRadius;
         return new Vector3(randomCircle.x, 0, randomCircle.y);
     }
