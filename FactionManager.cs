@@ -8,14 +8,18 @@ public class FactionManager : MonoBehaviour
     private static FactionManager instance;
     public static FactionManager Instance => instance;
     
+    [SerializeField] private Faction playerFaction;
+    public Faction PlayerFaction => playerFaction;
+
     // Core data storage
-    private Dictionary<FactionType, FactionData> factionData;
+    private Dictionary<Faction, Dictionary<Faction, float>> relationships;
+    private Dictionary<Faction, float> influences;
+    private Dictionary<Faction, HashSet<Ship>> factionShips;
     
     // Events
-    public event Action<FactionType, FactionType, float> OnRelationshipChanged;
-    public event Action<Pirate, FactionType, FactionType> OnMemberFactionChanged;
-    public event Action<Port, FactionType, FactionType> OnPortOwnershipChanged;
-    public event Action<FactionType, float> OnInfluenceChanged;
+    public event Action<Faction, Faction, float> OnRelationshipChanged;
+    public event Action<Ship, Faction> OnShipFactionChanged;
+    public event Action<Faction, float> OnInfluenceUpdated;
     
     private void Awake()
     {
@@ -33,160 +37,106 @@ public class FactionManager : MonoBehaviour
     
     private void InitializeFactionSystem()
     {
-        factionData = new Dictionary<FactionType, FactionData>();
-        
-        // Initialize all factions except None
-        var factionTypes = Enum.GetValues(typeof(FactionType))
-            .Cast<FactionType>()
-            .Where(f => f != FactionType.None);
-
-        foreach (var factionType in factionTypes)
-        {
-            CreateFaction(factionType, factionType.ToString());
-        }
-
-        // Set up initial relationships
-        SetupInitialRelationships();
-        
-        Debug.Log($"[FactionManager] Initialized {factionData.Count} factions");
+        relationships = new Dictionary<Faction, Dictionary<Faction, float>>();
+        influences = new Dictionary<Faction, float>();
+        factionShips = new Dictionary<Faction, HashSet<Ship>>();
+        Debug.Log("[FactionManager] Initialized faction system");
     }
 
-    private void SetupInitialRelationships()
+    public void RegisterFaction(Faction faction)
     {
-        // Example initial relationships
-        SetRelationship(FactionType.Pirates, FactionType.Merchants, FactionConstants.MIN_RELATIONSHIP);
-        SetRelationship(FactionType.Pirates, FactionType.RoyalNavy, FactionConstants.MIN_RELATIONSHIP);
-        SetRelationship(FactionType.Merchants, FactionType.RoyalNavy, FactionConstants.MAX_RELATIONSHIP);
-        
-        // Other relationships start neutral
-        var factionTypes = factionData.Keys.ToList();
-        for (int i = 0; i < factionTypes.Count; i++)
+        if (faction == null) return;
+
+        if (!relationships.ContainsKey(faction))
         {
-            for (int j = i + 1; j < factionTypes.Count; j++)
-            {
-                var factionA = factionTypes[i];
-                var factionB = factionTypes[j];
-                
-                if (!factionData[factionA].GetRelationship(factionB).Equals(FactionConstants.DEFAULT_STARTING_RELATIONSHIP))
-                    continue; // Skip if already set
-                    
-                SetRelationship(factionA, factionB, FactionConstants.DEFAULT_STARTING_RELATIONSHIP);
-            }
+            relationships[faction] = new Dictionary<Faction, float>();
+            influences[faction] = FactionConstants.DEFAULT_INFLUENCE;
+            factionShips[faction] = new HashSet<Ship>();
+            Debug.Log($"[FactionManager] Registered faction: {faction.FactionName}");
         }
     }
-    
-    private void CreateFaction(FactionType type, string name)
-    {
-        if (factionData.ContainsKey(type))
-        {
-            Debug.LogWarning($"[FactionManager] Faction {type} already exists!");
-            return;
-        }
-        
-        try
-        {
-            var faction = new FactionData(type, name);
-            factionData[type] = faction;
-            Debug.Log($"[FactionManager] Created faction: {name}");
-        }
-        catch (ArgumentException e)
-        {
-            Debug.LogError($"[FactionManager] Failed to create faction {type}: {e.Message}");
-        }
-    }
-    
+
     // Relationship Management
-    public float GetRelationship(FactionType a, FactionType b)
+    public float GetRelationship(Faction a, Faction b)
     {
-        if (!factionData.ContainsKey(a) || !factionData.ContainsKey(b))
-        {
-            throw new ArgumentException(FactionConstants.ERROR_INVALID_FACTION);
-        }
+        if (a == null || b == null || a == b) return FactionConstants.MAX_RELATIONSHIP;
         
-        return factionData[a].GetRelationship(b);
+        if (!relationships.ContainsKey(a) || !relationships.ContainsKey(b))
+            return FactionConstants.DEFAULT_STARTING_RELATIONSHIP;
+
+        if (relationships[a].TryGetValue(b, out float value))
+            return value;
+
+        return FactionConstants.DEFAULT_STARTING_RELATIONSHIP;
     }
     
-    public void SetRelationship(FactionType a, FactionType b, float value)
+    public void SetRelationship(Faction a, Faction b, float value)
     {
-        if (!factionData.ContainsKey(a) || !factionData.ContainsKey(b))
-        {
-            throw new ArgumentException(FactionConstants.ERROR_INVALID_FACTION);
-        }
+        if (a == null || b == null || a == b) return;
         
-        if (a == b)
-        {
-            throw new ArgumentException(FactionConstants.ERROR_SAME_FACTION);
-        }
+        value = Mathf.Clamp(value, FactionConstants.MIN_RELATIONSHIP, FactionConstants.MAX_RELATIONSHIP);
         
-        // Update both factions' relationship values
-        factionData[a].SetRelationship(b, value);
-        factionData[b].SetRelationship(a, value);
+        if (!relationships.ContainsKey(a)) relationships[a] = new Dictionary<Faction, float>();
+        if (!relationships.ContainsKey(b)) relationships[b] = new Dictionary<Faction, float>();
+        
+        relationships[a][b] = value;
+        relationships[b][a] = value;
         
         OnRelationshipChanged?.Invoke(a, b, value);
-        Debug.Log($"[FactionManager] Updated relationship between {a} and {b} to {value}");
+        Debug.Log($"[FactionManager] Updated relationship between {a.FactionName} and {b.FactionName} to {value}");
     }
     
-    // Member Management
-    public void AddMemberToFaction(Pirate pirate, FactionType faction)
+    // Ship Management
+    public void OnShipRegistered(Ship ship, Faction faction)
     {
-        if (pirate == null)
-            throw new ArgumentNullException(nameof(pirate));
-            
-        if (!factionData.ContainsKey(faction))
-            throw new ArgumentException(FactionConstants.ERROR_INVALID_FACTION);
-        
-        var oldFaction = pirate.CurrentFaction;
-        
-        // Remove from old faction if necessary
-        if (oldFaction != FactionType.None && factionData.ContainsKey(oldFaction))
+        if (ship == null || faction == null) return;
+
+        if (!factionShips.ContainsKey(faction))
+            factionShips[faction] = new HashSet<Ship>();
+
+        factionShips[faction].Add(ship);
+        OnShipFactionChanged?.Invoke(ship, faction);
+        Debug.Log($"[FactionManager] Registered ship {ship.ShipName} to faction {faction.FactionName}");
+    }
+
+    public void OnShipDestroyed(Ship ship, Faction faction)
+    {
+        if (ship == null || faction == null) return;
+
+        if (factionShips.ContainsKey(faction))
         {
-            factionData[oldFaction].RemoveMember(pirate);
+            factionShips[faction].Remove(ship);
+            Debug.Log($"[FactionManager] Removed destroyed ship {ship.ShipName} from faction {faction.FactionName}");
         }
-        
-        // Add to new faction
-        factionData[faction].AddMember(pirate);
-        pirate.InternalSetFaction(faction);
-        
-        OnMemberFactionChanged?.Invoke(pirate, oldFaction, faction);
-        Debug.Log($"[FactionManager] Added member to faction {faction}");
-    }
-    
-    public void RemoveMemberFromFaction(Pirate pirate, FactionType faction)
-    {
-        if (pirate == null)
-            throw new ArgumentNullException(nameof(pirate));
-            
-        if (!factionData.ContainsKey(faction))
-            throw new ArgumentException(FactionConstants.ERROR_INVALID_FACTION);
-        
-        factionData[faction].RemoveMember(pirate);
-        pirate.InternalSetFaction(FactionType.None);
-        
-        OnMemberFactionChanged?.Invoke(pirate, faction, FactionType.None);
-        Debug.Log($"[FactionManager] Removed member from faction {faction}");
     }
     
     // Influence Management
-    public void SetFactionInfluence(FactionType faction, float value)
+    public float GetInfluence(Faction faction)
     {
-        if (!factionData.ContainsKey(faction))
-        {
-            throw new ArgumentException(FactionConstants.ERROR_INVALID_FACTION);
-        }
+        if (faction == null) return 0f;
+        return influences.TryGetValue(faction, out float value) ? value : FactionConstants.DEFAULT_INFLUENCE;
+    }
+
+    public void UpdateInfluence(Faction faction, float newValue)
+    {
+        if (faction == null) return;
         
-        factionData[faction].SetInfluence(value);
-        OnInfluenceChanged?.Invoke(faction, value);
-        Debug.Log($"[FactionManager] Updated influence for {faction} to {value}");
+        newValue = Mathf.Clamp(newValue, 0f, FactionConstants.MAX_RELATIONSHIP);
+        influences[faction] = newValue;
+        OnInfluenceUpdated?.Invoke(faction, newValue);
+        Debug.Log($"[FactionManager] Updated influence for {faction.FactionName} to {newValue}");
     }
     
     // Utility Methods
-    public bool DoesFactionExist(FactionType faction)
+    public IEnumerable<Faction> GetAllFactions()
     {
-        return factionData.ContainsKey(faction);
+        return relationships.Keys;
     }
-    
-    public IReadOnlyList<FactionType> GetAllFactions()
+
+    public IReadOnlyCollection<Ship> GetFactionShips(Faction faction)
     {
-        return factionData.Keys.ToList().AsReadOnly();
+        if (faction != null && factionShips.TryGetValue(faction, out var ships))
+            return ships;
+        return new HashSet<Ship>();
     }
 }
