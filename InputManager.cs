@@ -41,7 +41,7 @@ public class InputManager : MonoBehaviour
 
     private void Update()
     {
-        if (player == null) return;
+        if (player == null || FactionManager.Instance == null) return;
 
         UpdateHoveredShip();
 
@@ -113,14 +113,30 @@ public class InputManager : MonoBehaviour
         ShipMovement movement = selectedShip.GetComponent<ShipMovement>();
         if (movement == null) return;
 
+        var selectedFactionMember = selectedShip.GetComponent<FactionMember>();
+        var targetFactionMember = targetShip.GetComponent<FactionMember>();
+
         // Check if ships are from different factions
-        if (selectedShip.ShipOwner != null && targetShip.ShipOwner != null && 
-            selectedShip.ShipOwner.Faction == targetShip.ShipOwner.Faction)
+        if (selectedFactionMember != null && targetFactionMember != null && 
+            selectedFactionMember.Faction == targetFactionMember.Faction)
         {
             // For friendly ships, just move to their position
             movement.SetTargetPosition(targetShip.transform.position);
             Debug.Log($"[InputManager] Moving to friendly ship {targetShip.ShipName}'s position");
             return;
+        }
+
+        // Check faction relationship
+        if (selectedFactionMember != null && targetFactionMember != null)
+        {
+            float relationship = FactionManager.Instance.GetRelationship(selectedFactionMember.Faction, targetFactionMember.Faction);
+            if (relationship > 75f) // High relationship threshold
+            {
+                // For allied ships, just move to their position
+                movement.SetTargetPosition(targetShip.transform.position);
+                Debug.Log($"[InputManager] Moving to allied ship {targetShip.ShipName}'s position");
+                return;
+            }
         }
 
         // Set combat target
