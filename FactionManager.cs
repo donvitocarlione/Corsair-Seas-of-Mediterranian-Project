@@ -1,6 +1,7 @@
 using UnityEngine;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 public class FactionManager : MonoBehaviour
 {
@@ -35,11 +36,41 @@ public class FactionManager : MonoBehaviour
         factionData = new Dictionary<FactionType, FactionData>();
         
         // Initialize all factions except None
-        foreach (FactionType factionType in Enum.GetValues(typeof(FactionType)))
+        var factionTypes = Enum.GetValues(typeof(FactionType))
+            .Cast<FactionType>()
+            .Where(f => f != FactionType.None);
+
+        foreach (var factionType in factionTypes)
         {
-            if (factionType != FactionType.None)
+            CreateFaction(factionType, factionType.ToString());
+        }
+
+        // Set up initial relationships
+        SetupInitialRelationships();
+        
+        Debug.Log($"[FactionManager] Initialized {factionData.Count} factions");
+    }
+
+    private void SetupInitialRelationships()
+    {
+        // Example initial relationships
+        SetRelationship(FactionType.Pirates, FactionType.Merchants, FactionConstants.MIN_RELATIONSHIP);
+        SetRelationship(FactionType.Pirates, FactionType.RoyalNavy, FactionConstants.MIN_RELATIONSHIP);
+        SetRelationship(FactionType.Merchants, FactionType.RoyalNavy, FactionConstants.MAX_RELATIONSHIP);
+        
+        // Other relationships start neutral
+        var factionTypes = factionData.Keys.ToList();
+        for (int i = 0; i < factionTypes.Count; i++)
+        {
+            for (int j = i + 1; j < factionTypes.Count; j++)
             {
-                CreateFaction(factionType, factionType.ToString());
+                var factionA = factionTypes[i];
+                var factionB = factionTypes[j];
+                
+                if (!factionData[factionA].GetRelationship(factionB).Equals(FactionConstants.DEFAULT_STARTING_RELATIONSHIP))
+                    continue; // Skip if already set
+                    
+                SetRelationship(factionA, factionB, FactionConstants.DEFAULT_STARTING_RELATIONSHIP);
             }
         }
     }
@@ -48,7 +79,7 @@ public class FactionManager : MonoBehaviour
     {
         if (factionData.ContainsKey(type))
         {
-            Debug.LogWarning($"Faction {type} already exists!");
+            Debug.LogWarning($"[FactionManager] Faction {type} already exists!");
             return;
         }
         
@@ -56,10 +87,11 @@ public class FactionManager : MonoBehaviour
         {
             var faction = new FactionData(type, name);
             factionData[type] = faction;
+            Debug.Log($"[FactionManager] Created faction: {name}");
         }
         catch (ArgumentException e)
         {
-            Debug.LogError($"Failed to create faction {type}: {e.Message}");
+            Debug.LogError($"[FactionManager] Failed to create faction {type}: {e.Message}");
         }
     }
     
@@ -81,20 +113,27 @@ public class FactionManager : MonoBehaviour
             throw new ArgumentException(FactionConstants.ERROR_INVALID_FACTION);
         }
         
+        if (a == b)
+        {
+            throw new ArgumentException(FactionConstants.ERROR_SAME_FACTION);
+        }
+        
         // Update both factions' relationship values
         factionData[a].SetRelationship(b, value);
         factionData[b].SetRelationship(a, value);
         
         OnRelationshipChanged?.Invoke(a, b, value);
+        Debug.Log($"[FactionManager] Updated relationship between {a} and {b} to {value}");
     }
     
     // Member Management
     public void AddMemberToFaction(Pirate pirate, FactionType faction)
     {
+        if (pirate == null)
+            throw new ArgumentNullException(nameof(pirate));
+            
         if (!factionData.ContainsKey(faction))
-        {
             throw new ArgumentException(FactionConstants.ERROR_INVALID_FACTION);
-        }
         
         var oldFaction = pirate.CurrentFaction;
         
@@ -109,19 +148,22 @@ public class FactionManager : MonoBehaviour
         pirate.InternalSetFaction(faction);
         
         OnMemberFactionChanged?.Invoke(pirate, oldFaction, faction);
+        Debug.Log($"[FactionManager] Added member to faction {faction}");
     }
     
     public void RemoveMemberFromFaction(Pirate pirate, FactionType faction)
     {
+        if (pirate == null)
+            throw new ArgumentNullException(nameof(pirate));
+            
         if (!factionData.ContainsKey(faction))
-        {
             throw new ArgumentException(FactionConstants.ERROR_INVALID_FACTION);
-        }
         
         factionData[faction].RemoveMember(pirate);
         pirate.InternalSetFaction(FactionType.None);
         
         OnMemberFactionChanged?.Invoke(pirate, faction, FactionType.None);
+        Debug.Log($"[FactionManager] Removed member from faction {faction}");
     }
     
     // Influence Management
@@ -134,5 +176,17 @@ public class FactionManager : MonoBehaviour
         
         factionData[faction].SetInfluence(value);
         OnInfluenceChanged?.Invoke(faction, value);
+        Debug.Log($"[FactionManager] Updated influence for {faction} to {value}");
+    }
+    
+    // Utility Methods
+    public bool DoesFactionExist(FactionType faction)
+    {
+        return factionData.ContainsKey(faction);
+    }
+    
+    public IReadOnlyList<FactionType> GetAllFactions()
+    {
+        return factionData.Keys.ToList().AsReadOnly();
     }
 }
