@@ -4,7 +4,22 @@ using System.Collections.Generic;
 public class CombatSystem : MonoBehaviour
 {
     private static CombatSystem instance;
-    public static CombatSystem Instance => instance;
+    public static CombatSystem Instance
+    {
+        get
+        {
+            if (instance == null)
+            {
+                instance = Object.FindFirstObjectByType<CombatSystem>();
+                if (instance == null)
+                {
+                    GameObject obj = new GameObject("CombatSystem");
+                    instance = obj.AddComponent<CombatSystem>();
+                }
+            }
+            return instance;
+        }
+    }
 
     [Header("Debug Settings")]
     [SerializeField] private bool showDebugGizmos = true;
