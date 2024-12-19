@@ -1,68 +1,76 @@
 using UnityEngine;
+using CSM.Base;
 
-[RequireComponent(typeof(Ship))]
-public class FactionMember : MonoBehaviour
+namespace CorsairGame
 {
-    [SerializeField] private Faction faction;
-    public Faction Faction => faction;
-
-    private Ship ship;
-
-    private void Awake()
+    [RequireComponent(typeof(Ship))]
+    public class FactionMember : MonoBehaviour
     {
-        ship = GetComponent<Ship>();
-    }
+        [SerializeField] private FactionType faction;
+        public FactionType Faction => faction;
 
-    private void Start()
-    {
-        if (faction != null && FactionManager.Instance != null)
+        private Ship ship;
+
+        private void Awake()
         {
-            FactionManager.Instance.OnShipRegistered(ship, faction);
+            ship = GetComponent<Ship>();
         }
-    }
 
-    public void SetFaction(Faction newFaction)
-    {
-        if (newFaction == faction) return;
-
-        var oldFaction = faction;
-        faction = newFaction;
-
-        if (FactionManager.Instance != null)
+        private void Start()
         {
-            if (oldFaction != null)
+            if (FactionManager.Instance != null)
             {
-                FactionManager.Instance.OnShipDestroyed(ship, oldFaction);
-            }
-
-            if (newFaction != null)
-            {
-                FactionManager.Instance.OnShipRegistered(ship, newFaction);
+                FactionManager.Instance.OnShipRegistered(ship, faction);
             }
         }
-    }
 
-    public bool IsFriendly(FactionMember other)
-    {
-        if (other == null || faction == null || other.faction == null)
-            return false;
-
-        return faction.IsFriendlyWith(other.faction);
-    }
-
-    public bool IsHostile(FactionMember other)
-    {
-        if (other == null || faction == null || other.faction == null)
-            return false;
-
-        return faction.IsHostileWith(other.faction);
-    }
-
-    private void OnDestroy()
-    {
-        if (faction != null && FactionManager.Instance != null)
+        public void SetFaction(FactionType newFaction)
         {
-            FactionManager.Instance.OnShipDestroyed(ship, faction);
+            if (newFaction == faction) return;
+
+            var oldFaction = faction;
+            faction = newFaction;
+
+            if (FactionManager.Instance != null)
+            {
+                if (oldFaction != FactionType.None)
+                {
+                    FactionManager.Instance.OnShipDestroyed(ship, oldFaction);
+                }
+
+                if (newFaction != FactionType.None)
+                {
+                    FactionManager.Instance.OnShipRegistered(ship, newFaction);
+                }
+            }
+        }
+
+        public bool IsFriendly(FactionMember other)
+        {
+            if (other == null)
+                return false;
+
+            if (FactionManager.Instance == null) return false;
+
+            return FactionManager.Instance.AreFactionsAllied(this.faction, other.faction);
+        }
+
+        public bool IsHostile(FactionMember other)
+        {
+            if (other == null)
+                return false;
+
+            if (FactionManager.Instance == null) return false;
+
+            return FactionManager.Instance.AreFactionsAtWar(this.faction, other.faction);
+        }
+
+        private void OnDestroy()
+        {
+            if (FactionManager.Instance != null)
+            {
+                FactionManager.Instance.OnShipDestroyed(ship, faction);
+            }
         }
     }
 }
