@@ -2,6 +2,7 @@ using UnityEngine;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using CorsairGame;
 
 public class FactionManager : MonoBehaviour
 {
@@ -12,6 +13,7 @@ public class FactionManager : MonoBehaviour
     public Faction PlayerFaction => playerFaction;
 
     // Core data storage
+    private Dictionary<FactionType, Faction> factions = new Dictionary<FactionType, Faction>();
     private Dictionary<Faction, Dictionary<Faction, float>> relationships;
     private Dictionary<Faction, float> influences;
     private Dictionary<Faction, HashSet<Ship>> factionShips;
@@ -20,8 +22,6 @@ public class FactionManager : MonoBehaviour
     public event Action<Faction, Faction, float> OnRelationshipChanged;
     public event Action<Ship, Faction> OnShipFactionChanged;
     public event Action<Faction, float> OnInfluenceUpdated;
-    public event Action<Ship, Faction> OnShipRegistered;
-    public event Action<Ship, Faction> OnShipDestroyed;
     
     private void Awake()
     {
@@ -49,6 +49,8 @@ public class FactionManager : MonoBehaviour
     {
         if (faction == null) return;
 
+        factions[faction.Type] = faction;
+
         if (!relationships.ContainsKey(faction))
         {
             relationships[faction] = new Dictionary<Faction, float>();
@@ -56,6 +58,11 @@ public class FactionManager : MonoBehaviour
             factionShips[faction] = new HashSet<Ship>();
             Debug.Log($"[FactionManager] Registered faction: {faction.FactionName}");
         }
+    }
+
+    public Faction GetFactionByType(FactionType type)
+    {
+        return factions.TryGetValue(type, out var faction) ? faction : null;
     }
 
     // Relationship Management
@@ -97,7 +104,6 @@ public class FactionManager : MonoBehaviour
             factionShips[faction] = new HashSet<Ship>();
 
         factionShips[faction].Add(ship);
-        OnShipRegistered?.Invoke(ship, faction);
         OnShipFactionChanged?.Invoke(ship, faction);
         Debug.Log($"[FactionManager] Registered ship {ship.ShipName} to faction {faction.FactionName}");
     }
@@ -109,7 +115,6 @@ public class FactionManager : MonoBehaviour
         if (factionShips.ContainsKey(faction))
         {
             factionShips[faction].Remove(ship);
-            OnShipDestroyed?.Invoke(ship, faction);
             Debug.Log($"[FactionManager] Removed ship {ship.ShipName} from faction {faction.FactionName}");
         }
     }
@@ -131,6 +136,25 @@ public class FactionManager : MonoBehaviour
         Debug.Log($"[FactionManager] Updated influence for {faction.FactionName} to {newValue}");
     }
     
+    // Relation Status Methods
+    public bool AreFactionsAllied(Faction a, Faction b)
+    {
+        if (a == null || b == null) return false;
+        if (a == b) return true;
+        
+        float relationship = GetRelationship(a, b);
+        return relationship >= FactionConstants.FRIENDLY_THRESHOLD;
+    }
+
+    public bool AreFactionsAtWar(Faction a, Faction b)
+    {
+        if (a == null || b == null) return false;
+        if (a == b) return false;
+        
+        float relationship = GetRelationship(a, b);
+        return relationship <= FactionConstants.HOSTILE_THRESHOLD;
+    }
+
     // Utility Methods
     public IEnumerable<Faction> GetAllFactions()
     {
@@ -142,17 +166,5 @@ public class FactionManager : MonoBehaviour
         if (faction != null && factionShips.TryGetValue(faction, out var ships))
             return ships;
         return new HashSet<Ship>();
-    }
-
-    public bool AreFactionsAllied(FactionType a, FactionType b)
-    {
-        // Implement your alliance logic here
-        return false; // Placeholder
-    }
-
-    public bool AreFactionsAtWar(FactionType a, FactionType b)
-    {
-        // Implement your war state logic here
-        return false; // Placeholder
     }
 }
