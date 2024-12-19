@@ -49,7 +49,7 @@ public class ShipMovement : MonoBehaviour
     private float engageStartTime;
     private bool hasFired;
     
-    void Start()
+    private void Start()
     {
         rb = GetComponent<Rigidbody>();
         ownShip = GetComponent<Ship>();
@@ -73,7 +73,7 @@ public class ShipMovement : MonoBehaviour
         Debug.Log($"[ShipMovement] Initialized {gameObject.name} with maxSpeed={maxSpeed}, stoppingDistance={stoppingDistance}");
     }
     
-    void FixedUpdate()
+    private void FixedUpdate()
     {
         if (isMoving)
         {
@@ -95,15 +95,15 @@ public class ShipMovement : MonoBehaviour
         MaintainWaterLevel();
     }
     
-    void MaintainWaterLevel()
+    private void MaintainWaterLevel()
     {
         float targetHeight = waterLevel + buoyancyOffset;
         Vector3 newPosition = rb.position;
         newPosition.y = Mathf.SmoothDamp(rb.position.y, targetHeight, ref heightVelocity, heightSmoothTime);
         rb.MovePosition(newPosition);
     }
-    
-    void UpdateCombatMovement()
+
+    private void UpdateCombatMovement()
     {
         if (targetShip == null) return;
 
@@ -128,14 +128,13 @@ public class ShipMovement : MonoBehaviour
             }
         }
 
-        // Check for disengagement
         if (ShouldDisengage())
         {
             ClearCombatTarget();
         }
     }
 
-    Vector3 CalculateIdealCombatPosition()
+    private Vector3 CalculateIdealCombatPosition()
     {
         if (targetShip == null) return transform.position;
 
@@ -146,7 +145,7 @@ public class ShipMovement : MonoBehaviour
         return idealPosition;
     }
 
-    bool ShouldReposition(float currentDistance)
+    private bool ShouldReposition(float currentDistance)
     {
         if (Time.time - lastRepositionTime < minEngageTime) return false;
 
@@ -156,7 +155,7 @@ public class ShipMovement : MonoBehaviour
         return distanceInvalid || !inFiringArc;
     }
 
-    bool IsInFiringArc()
+    private bool IsInFiringArc()
     {
         if (targetShip == null || ownShip == null) return false;
 
@@ -166,7 +165,7 @@ public class ShipMovement : MonoBehaviour
         return angle <= ownShip.FiringArc * 0.5f;
     }
 
-    bool ShouldFire()
+    private bool ShouldFire()
     {
         if (ownShip == null || targetShip == null) return false;
         if (!IsInFiringArc()) return false;
@@ -174,7 +173,7 @@ public class ShipMovement : MonoBehaviour
         return ownShip.CanFire;
     }
 
-    void FireAtTarget()
+    private void FireAtTarget()
     {
         if (ownShip == null || targetShip == null) return;
         if (ownShip.CanFire)
@@ -185,11 +184,10 @@ public class ShipMovement : MonoBehaviour
         }
     }
 
-    bool ShouldDisengage()
+    private bool ShouldDisengage()
     {
         if (ownShip == null || targetShip == null) return true;
         
-        // Disengage if we haven't fired for a while after the minimum engage time
         if (hasFired && Time.time - lastFireTime > disengageTime)
         {
             return true;
@@ -198,7 +196,7 @@ public class ShipMovement : MonoBehaviour
         return false;
     }
     
-    void MoveTowardsTarget()
+    private void MoveTowardsTarget()
     {
         if (rb == null) return;
         
@@ -232,7 +230,7 @@ public class ShipMovement : MonoBehaviour
         rb.AddForce(movementForce * (1f - waterDrag * Time.fixedDeltaTime), ForceMode.Acceleration);
     }
 
-    void RotateTowardsTarget(Vector3 targetPos)
+    private void RotateTowardsTarget(Vector3 targetPos)
     {
         Vector3 directionToTarget = (targetPos - transform.position);
         directionToTarget.y = 0;
@@ -250,7 +248,7 @@ public class ShipMovement : MonoBehaviour
         transform.rotation = Quaternion.Euler(0, smoothedRotation, 0);
     }
     
-    void StopShip()
+    private void StopShip()
     {
         if (currentTargetType != TargetType.Combat)
         {
@@ -261,6 +259,8 @@ public class ShipMovement : MonoBehaviour
             
             rb.velocity = Vector3.zero;
             rb.angularVelocity = Vector3.zero;
+            
+            Debug.Log($"[ShipMovement] {gameObject.name} reached target and stopped");
         }
     }
 
@@ -286,7 +286,7 @@ public class ShipMovement : MonoBehaviour
         currentTargetType = TargetType.Combat;
         inCombat = true;
         engageStartTime = Time.time;
-        lastFireTime = Time.time - minEngageTime; // Allow immediate firing if conditions are met
+        lastFireTime = Time.time - minEngageTime;
         hasFired = false;
         Debug.Log($"[ShipMovement] {gameObject.name} set combat target {target.ShipName} at position {position}");
 
@@ -325,13 +325,41 @@ public class ShipMovement : MonoBehaviour
     public void SetMovementDirection(Vector3 direction)
     {
         Vector3 worldDirection = direction.normalized;
-        worldDirection.y = 0; // Keep movement on the horizontal plane
+        worldDirection.y = 0;
         
-        // Set target position some distance ahead in the desired direction
         Vector3 targetPos = transform.position + worldDirection * 10f;
         SetTargetPosition(targetPos);
         
         Debug.Log($"[ShipMovement] {gameObject.name} moving in direction {worldDirection}");
+    }
+
+    private void OnDrawGizmosSelected()
+    {
+        if (!Application.isPlaying) return;
+        
+        Gizmos.color = Color.yellow;
+        Gizmos.DrawWireSphere(targetPosition, 0.5f);
+        
+        Gizmos.color = Color.red;
+        Gizmos.DrawWireSphere(targetPosition, targetShip != null ? combatStoppingDistance : stoppingDistance);
+        
+        Gizmos.color = Color.blue;
+        Vector3 waterPos = transform.position;
+        waterPos.y = waterLevel;
+        Gizmos.DrawWireCube(waterPos, new Vector3(2f, 0.1f, 2f));
+
+        if (targetShip != null)
+        {
+            Gizmos.color = Color.red;
+            Gizmos.DrawLine(transform.position, targetShip.transform.position);
+            
+            Gizmos.color = Color.green;
+            Gizmos.DrawWireSphere(targetShip.transform.position, optimalCombatDistance);
+            
+            Gizmos.color = new Color(1f, 1f, 0f, 0.3f);
+            Gizmos.DrawWireSphere(targetShip.transform.position, optimalCombatDistance + repositionThreshold);
+            Gizmos.DrawWireSphere(targetShip.transform.position, optimalCombatDistance - repositionThreshold);
+        }
     }
 
     public bool IsInCombat() => inCombat;
