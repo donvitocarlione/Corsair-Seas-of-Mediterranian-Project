@@ -1,113 +1,48 @@
 using UnityEngine;
+using CSM.Base;
 
-public class Ship : MonoBehaviour
+namespace CorsairGame
 {
-    [SerializeField] protected string shipName;
-    public string Name => shipName;
-    public string ShipName => shipName; // Additional property for backward compatibility
-
-    [SerializeField] protected float attackRange = 20f;
-    public float AttackRange => attackRange;
-
-    [SerializeField] protected float firingArc = 60f;
-    public float FiringArc => firingArc;
-
-    [SerializeField] protected float attackDamage = 10f;
-    public float AttackDamage => attackDamage;
-
-    [SerializeField] protected int maxAmmo = 10;
-    [SerializeField] protected float reloadTime = 3f;
-    protected float reloadTimer;
-    protected int currentAmmo;
-    public int CurrentAmmo => currentAmmo;
-
-    [SerializeField] protected Transform[] firingPoints;
-    
-    public bool IsSinking { get; protected set; } = false;
-    public bool IsSelected { get; protected set; } = false;
-
-    protected ShipMovement movement;
-    protected FiringSystem firingSystem;
-    protected Pirate shipOwner;
-
-    public ShipMovement Movement => movement;
-    public FiringSystem FiringSystem => firingSystem;
-    public Pirate ShipOwner => shipOwner;
-
-    protected virtual void Awake()
+    public class Ship : MonoBehaviour
     {
-        movement = GetComponent<ShipMovement>();
-        firingSystem = GetComponent<FiringSystem>();
-        shipOwner = GetComponent<Pirate>();
-        currentAmmo = maxAmmo;
-    }
-
-    protected virtual void Start()
-    {
-        if (string.IsNullOrEmpty(shipName))
+        [SerializeField] private Pirate owner;
+        [SerializeField] private string shipName;
+        [SerializeField] private float maxHealth = 100f;
+        
+        private float currentHealth;
+        
+        public Pirate Owner => owner;
+        public string ShipName => shipName;
+        public float MaxHealth => maxHealth;
+        public float CurrentHealth => currentHealth;
+        
+        private void Start()
         {
-            shipName = gameObject.name;
+            currentHealth = maxHealth;
         }
-    }
-
-    protected virtual void Update()
-    {
-        if (currentAmmo < maxAmmo)
+        
+        public bool SetOwner(Pirate newOwner)
         {
-            reloadTimer -= Time.deltaTime;
-            if (reloadTimer <= 0)
+            if (owner == newOwner) return false;
+            
+            owner = newOwner;
+            return true;
+        }
+        
+        public void TakeDamage(float damage)
+        {
+            currentHealth = Mathf.Max(0, currentHealth - damage);
+            
+            if (currentHealth <= 0)
             {
-                currentAmmo++;
-                reloadTimer = reloadTime;
+                Die();
             }
         }
-    }
-
-    public virtual void TakeDamage(float amount)
-    {
-        // Implement damage logic in derived classes
-        Debug.Log($"[Ship] {shipName} took {amount} damage!");
-    }
-
-    public virtual Transform[] GetFiringPoints()
-    {
-        return firingPoints;
-    }
-
-    public bool CanFire => CurrentAmmo > 0;
-
-    public virtual void SetSelected(bool selected)
-    {
-        IsSelected = selected;
-    }
-
-    public virtual void StartSinking()
-    {
-        IsSinking = true;
-        // Derived classes should implement specific sinking behavior
-    }
-
-    public virtual void ConsumeAmmo()
-    {
-        if (currentAmmo > 0)
+        
+        private void Die()
         {
-            currentAmmo--;
-            reloadTimer = reloadTime;
+            // Implement ship destruction logic
+            gameObject.SetActive(false);
         }
-    }
-
-    public virtual void Fire(Ship target)
-    {
-        if (!CanFire)
-        {
-            Debug.Log($"[Ship] {ShipName} cannot fire");
-            return;
-        }
-        if (firingSystem != null)
-        {
-            firingSystem.FireProjectile(this, target);
-            ConsumeAmmo();
-        }
-        Debug.Log($"[Ship] {ShipName} is firing at {target.ShipName}");
     }
 }
