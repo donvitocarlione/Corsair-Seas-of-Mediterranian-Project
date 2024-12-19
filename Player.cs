@@ -1,94 +1,61 @@
 using UnityEngine;
 using System.Collections.Generic;
+using CSM.Base;
 
-public class Player : Pirate
+namespace CorsairGame
 {
-    private List<Ship> controlledShips = new List<Ship>();
-    private Ship selectedShip;
-
-    public Ship SelectedShip => selectedShip;
-    public IReadOnlyList<Ship> ControlledShips => controlledShips;
-
-    public virtual void AddShip(Ship ship)
+    public class Player : MonoBehaviour
     {
-        if (ship == null)
+        [SerializeField] private Pirate activePirate;
+        [SerializeField] private List<Pirate> pirates = new List<Pirate>();
+        
+        public Pirate ActivePirate => activePirate;
+        
+        private void Start()
         {
-            Debug.LogWarning("[Player] Attempted to add null ship");
-            return;
-        }
-
-        if (!controlledShips.Contains(ship))
-        {
-            controlledShips.Add(ship);
-            Debug.Log($"[Player] Added ship: {ship.Name}");
-
-            // If this is our first ship, automatically select it
-            if (selectedShip == null)
+            if (pirates.Count > 0 && activePirate == null)
             {
-                SelectShip(ship);
+                SetActivePirate(pirates[0]);
             }
         }
-    }
-
-    public virtual void SelectShip(Ship ship)
-    {
-        if (ship == null)
+        
+        public void AddPirate(Pirate pirate)
         {
-            Debug.LogWarning("[Player] Attempted to select null ship");
-            return;
-        }
-
-        if (!controlledShips.Contains(ship))
-        {
-            Debug.LogWarning($"[Player] Attempted to select uncontrolled ship: {ship.Name}");
-            return;
-        }
-
-        selectedShip = ship;
-        Debug.Log($"[Player] Selected ship: {ship.Name}");
-    }
-
-    public virtual void RemoveShip(Ship ship)
-    {
-        if (ship == null)
-        {
-            Debug.LogWarning("[Player] Attempted to remove null ship");
-            return;
-        }
-
-        if (controlledShips.Contains(ship))
-        {
-            controlledShips.Remove(ship);
-            Debug.Log($"[Player] Removed ship: {ship.Name}");
-
-            // If we removed the selected ship, select a new one if available
-            if (ship == selectedShip)
+            if (!pirates.Contains(pirate))
             {
-                selectedShip = controlledShips.Count > 0 ? controlledShips[0] : null;
-                if (selectedShip != null)
+                pirates.Add(pirate);
+                
+                if (activePirate == null)
                 {
-                    Debug.Log($"[Player] Auto-selected new ship: {selectedShip.Name}");
+                    SetActivePirate(pirate);
                 }
             }
         }
-    }
-
-    public virtual void SelectNextShip()
-    {
-        if (controlledShips.Count == 0)
+        
+        public void RemovePirate(Pirate pirate)
         {
-            Debug.LogWarning("[Player] No controlled ships");
-            return;
+            if (pirates.Contains(pirate))
+            {
+                pirates.Remove(pirate);
+                
+                if (activePirate == pirate)
+                {
+                    SetActivePirate(pirates.Count > 0 ? pirates[0] : null);
+                }
+            }
         }
-
-        int currentIndex = controlledShips.IndexOf(selectedShip);
-        int nextIndex = (currentIndex + 1) % controlledShips.Count;
-        SelectShip(controlledShips[nextIndex]);
-        Debug.Log($"[Player] Selected next ship: {selectedShip.Name}");
-    }
-
-    public virtual Ship GetSelectedShip()
-    {
-        return selectedShip;
+        
+        public void SetActivePirate(Pirate pirate)
+        {
+            if (pirates.Contains(pirate) || pirate == null)
+            {
+                activePirate = pirate;
+            }
+        }
+        
+        public List<Pirate> GetAllPirates()
+        {
+            return new List<Pirate>(pirates);
+        }
     }
 }
