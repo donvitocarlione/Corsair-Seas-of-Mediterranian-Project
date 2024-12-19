@@ -20,7 +20,7 @@ namespace CorsairGame
         {
             if (FactionManager.Instance != null)
             {
-                FactionManager.Instance.OnShipRegistered(ship, faction);
+                FactionManager.Instance.RegisterShip(ship, faction);
             }
         }
 
@@ -35,12 +35,12 @@ namespace CorsairGame
             {
                 if (oldFaction != FactionType.None)
                 {
-                    FactionManager.Instance.OnShipDestroyed(ship, oldFaction);
+                    FactionManager.Instance.UnregisterShip(ship, oldFaction);
                 }
 
                 if (newFaction != FactionType.None)
                 {
-                    FactionManager.Instance.OnShipRegistered(ship, newFaction);
+                    FactionManager.Instance.RegisterShip(ship, newFaction);
                 }
             }
         }
@@ -69,7 +69,7 @@ namespace CorsairGame
         {
             if (FactionManager.Instance != null)
             {
-                FactionManager.Instance.OnShipDestroyed(ship, faction);
+                FactionManager.Instance.UnregisterShip(ship, faction);
             }
         }
     }
