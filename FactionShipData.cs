@@ -1,28 +1,44 @@
 using UnityEngine;
+using System.Collections.Generic;
+using CSM.Base;
 
 namespace CorsairGame
 {
     [System.Serializable]
     public class FactionShipData
     {
-        public string shipName;
-        public FactionType factionType;
-        public GameObject shipPrefab;
-        public int maxHealth = 100;
-        public float speed = 10f;
-        public float turnSpeed = 30f;
-        public float accelerationRate = 5f;
-        public float brakingRate = 3f;
-        
-        // Combat stats
-        public int cannonDamage = 10;
-        public float reloadTime = 2f;
-        public float cannonRange = 50f;
-        public int maxCrewSize = 20;
-        
-        // Economic stats
-        public int cargoCapacity = 100;
-        public int maintenanceCost = 10;
-        public int hirePrice = 1000;
+        public FactionType faction;
+        public List<GameObject> shipPrefabs;
+        public Vector3 spawnArea;
+        public float spawnRadius = 100f;
+        public int initialShipCount = 3;
+        public bool isPlayerFaction;
+        public int initialPirateCount = 2;
+
+        [SerializeField] private float spawnHeightAboveWater;
+        public float SpawnHeightAboveWater => spawnHeightAboveWater;
+        public List<GameObject> ShipPrefabs => shipPrefabs;
+        public FactionType Faction => faction;
+        public bool IsPlayerFaction => isPlayerFaction;
+
+        public bool Validate()
+        {
+            if (shipPrefabs == null || shipPrefabs.Count == 0)
+            {
+                Debug.LogError($"Missing ship prefabs for faction {faction}");
+                return false;
+            }
+
+            foreach (var prefab in shipPrefabs)
+            {
+                if (prefab == null || prefab.GetComponent<Ship>() == null)
+                {
+                    Debug.LogError($"Invalid ship prefab configuration for faction {faction}");
+                    return false;
+                }
+            }
+
+            return spawnRadius > 0;
+        }
     }
 }
