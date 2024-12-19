@@ -20,6 +20,8 @@ public class FactionManager : MonoBehaviour
     public event Action<Faction, Faction, float> OnRelationshipChanged;
     public event Action<Ship, Faction> OnShipFactionChanged;
     public event Action<Faction, float> OnInfluenceUpdated;
+    public event Action<Ship, Faction> OnShipRegistered;
+    public event Action<Ship, Faction> OnShipDestroyed;
     
     private void Awake()
     {
@@ -87,7 +89,7 @@ public class FactionManager : MonoBehaviour
     }
     
     // Ship Management
-    public void OnShipRegistered(Ship ship, Faction faction)
+    public void RegisterShip(Ship ship, Faction faction)
     {
         if (ship == null || faction == null) return;
 
@@ -95,18 +97,20 @@ public class FactionManager : MonoBehaviour
             factionShips[faction] = new HashSet<Ship>();
 
         factionShips[faction].Add(ship);
+        OnShipRegistered?.Invoke(ship, faction);
         OnShipFactionChanged?.Invoke(ship, faction);
         Debug.Log($"[FactionManager] Registered ship {ship.ShipName} to faction {faction.FactionName}");
     }
 
-    public void OnShipDestroyed(Ship ship, Faction faction)
+    public void UnregisterShip(Ship ship, Faction faction)
     {
         if (ship == null || faction == null) return;
 
         if (factionShips.ContainsKey(faction))
         {
             factionShips[faction].Remove(ship);
-            Debug.Log($"[FactionManager] Removed destroyed ship {ship.ShipName} from faction {faction.FactionName}");
+            OnShipDestroyed?.Invoke(ship, faction);
+            Debug.Log($"[FactionManager] Removed ship {ship.ShipName} from faction {faction.FactionName}");
         }
     }
     
@@ -138,5 +142,17 @@ public class FactionManager : MonoBehaviour
         if (faction != null && factionShips.TryGetValue(faction, out var ships))
             return ships;
         return new HashSet<Ship>();
+    }
+
+    public bool AreFactionsAllied(FactionType a, FactionType b)
+    {
+        // Implement your alliance logic here
+        return false; // Placeholder
+    }
+
+    public bool AreFactionsAtWar(FactionType a, FactionType b)
+    {
+        // Implement your war state logic here
+        return false; // Placeholder
     }
 }
