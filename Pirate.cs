@@ -1,10 +1,11 @@
 using UnityEngine;
+using System.Collections.Generic;
+using CSM.Base;
 
 namespace CorsairGame
 {
-    public class Pirate : MonoBehaviour
+    public class Pirate : SeaEntityBase, IShipOwner
     {
-        public FactionType faction;
         public string pirateName;
         public int level = 1;
         public float health = 100f;
@@ -25,12 +26,12 @@ namespace CorsairGame
         public string armorEquipped;
         public string accessoryEquipped;
         
-        private void Start()
+        protected virtual void Start()
         {
             health = maxHealth;
         }
         
-        public void TakeDamage(float damage)
+        public virtual void TakeDamage(float damage)
         {
             float actualDamage = Mathf.Max(0, damage - defense);
             health = Mathf.Max(0, health - actualDamage);
@@ -41,13 +42,13 @@ namespace CorsairGame
             }
         }
         
-        private void Die()
+        protected virtual void Die()
         {
             // Implement death logic here
             gameObject.SetActive(false);
         }
         
-        public void GainExperience(int amount)
+        public virtual void GainExperience(int amount)
         {
             experience += amount;
             CheckLevelUp();
@@ -73,6 +74,26 @@ namespace CorsairGame
             
             // Reset experience for next level
             experience = 0;
+        }
+
+        public virtual void AddShip(Ship ship)
+        {
+            throw new System.NotImplementedException();
+        }
+
+        public virtual void RemoveShip(Ship ship)
+        {
+           throw new System.NotImplementedException();
+        }
+
+        public virtual void SelectShip(Ship ship)
+        {
+           throw new System.NotImplementedException();
+        }
+
+        public virtual List<Ship> GetOwnedShips()
+        {
+          throw new System.NotImplementedException();
         }
     }
 }
