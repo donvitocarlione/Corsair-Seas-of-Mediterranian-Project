@@ -1,76 +1,87 @@
 using UnityEngine;
-using CSM.Base;
+using CorsairGame;
 
-namespace CorsairGame
+[RequireComponent(typeof(Ship))]
+public class FactionMember : MonoBehaviour
 {
-    [RequireComponent(typeof(Ship))]
-    public class FactionMember : MonoBehaviour
+    [SerializeField] private FactionType factionType = FactionType.None;
+    public FactionType FactionType => factionType;
+
+    private Ship ship;
+    private Faction faction;
+
+    private void Awake()
     {
-        [SerializeField] private FactionType faction;
-        public FactionType Faction => faction;
+        ship = GetComponent<Ship>();
+    }
 
-        private Ship ship;
-
-        private void Awake()
+    private void Start()
+    {
+        if (FactionManager.Instance != null)
         {
-            ship = GetComponent<Ship>();
-        }
-
-        private void Start()
-        {
-            if (FactionManager.Instance != null)
+            // Get faction from the type
+            faction = FactionManager.Instance.GetFactionByType(factionType);
+            if (faction != null)
             {
                 FactionManager.Instance.RegisterShip(ship, faction);
             }
-        }
-
-        public void SetFaction(FactionType newFaction)
-        {
-            if (newFaction == faction) return;
-
-            var oldFaction = faction;
-            faction = newFaction;
-
-            if (FactionManager.Instance != null)
+            else
             {
-                if (oldFaction != FactionType.None)
-                {
-                    FactionManager.Instance.UnregisterShip(ship, oldFaction);
-                }
-
-                if (newFaction != FactionType.None)
-                {
-                    FactionManager.Instance.RegisterShip(ship, newFaction);
-                }
+                Debug.LogError($"[FactionMember] Could not find faction for type {factionType}");
             }
         }
+    }
 
-        public bool IsFriendly(FactionMember other)
+    public void SetFaction(FactionType newFactionType)
+    {
+        if (newFactionType == factionType) return;
+
+        var oldFactionType = factionType;
+        factionType = newFactionType;
+
+        if (FactionManager.Instance != null)
         {
-            if (other == null)
-                return false;
+            var oldFaction = FactionManager.Instance.GetFactionByType(oldFactionType);
+            var newFaction = FactionManager.Instance.GetFactionByType(newFactionType);
 
-            if (FactionManager.Instance == null) return false;
-
-            return FactionManager.Instance.AreFactionsAllied(this.faction, other.faction);
-        }
-
-        public bool IsHostile(FactionMember other)
-        {
-            if (other == null)
-                return false;
-
-            if (FactionManager.Instance == null) return false;
-
-            return FactionManager.Instance.AreFactionsAtWar(this.faction, other.faction);
-        }
-
-        private void OnDestroy()
-        {
-            if (FactionManager.Instance != null)
+            if (oldFaction != null)
             {
-                FactionManager.Instance.UnregisterShip(ship, faction);
+                FactionManager.Instance.UnregisterShip(ship, oldFaction);
             }
+
+            if (newFaction != null)
+            {
+                FactionManager.Instance.RegisterShip(ship, newFaction);
+                faction = newFaction;
+            }
+        }
+    }
+
+    public bool IsFriendly(FactionMember other)
+    {
+        if (other == null || faction == null)
+            return false;
+
+        if (FactionManager.Instance == null) return false;
+
+        return FactionManager.Instance.AreFactionsAllied(faction, other.faction);
+    }
+
+    public bool IsHostile(FactionMember other)
+    {
+        if (other == null || faction == null)
+            return false;
+
+        if (FactionManager.Instance == null) return false;
+
+        return FactionManager.Instance.AreFactionsAtWar(faction, other.faction);
+    }
+
+    private void OnDestroy()
+    {
+        if (FactionManager.Instance != null && faction != null)
+        {
+            FactionManager.Instance.UnregisterShip(ship, faction);
         }
     }
 }
