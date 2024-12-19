@@ -26,8 +26,9 @@ namespace CorsairGame
         public string armorEquipped;
         public string accessoryEquipped;
         
-        protected virtual void Start()
+        protected override void Start()
         {
+            base.Start();
             health = maxHealth;
         }
         
@@ -74,6 +75,11 @@ namespace CorsairGame
             
             // Reset experience for next level
             experience = 0;
+        }
+
+        protected override void OnDestroy()
+        {
+            base.OnDestroy();
         }
 
         public virtual void AddShip(Ship ship)
