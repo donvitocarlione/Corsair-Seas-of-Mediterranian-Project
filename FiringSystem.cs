@@ -9,7 +9,7 @@ public class FiringSystem : MonoBehaviour
         {
             if (instance == null)
             {
-                instance = FindFirstObjectByType<FiringSystem>();
+                instance = Object.FindFirstObjectByType<FiringSystem>();
                 if (instance == null)
                 {
                     GameObject obj = new GameObject("FiringSystem");
@@ -114,7 +114,7 @@ public class FiringSystem : MonoBehaviour
         if (!showDebugGizmos) return;
 
         // Draw firing points for selected ships
-        Ship[] selectedShips = FindObjectsByType<Ship>(FindObjectsSortMode.None);
+        Ship[] selectedShips = Object.FindObjectsByType<Ship>(FindObjectsSortMode.None);
         foreach (Ship ship in selectedShips)
         {
             if (ship.IsSelected)
