@@ -1,62 +1,40 @@
 using UnityEngine;
 using System.Collections.Generic;
 
-public class FactionDefinition
+namespace CorsairGame
 {
-    public FactionType Type { get; private set; }
-    public string Name { get; private set; }
-    public int Influence { get; set; }
-    public int ResourceLevel { get; set; }
-    public Color Color { get; set; }
-    public string BaseLocation { get; set; }
-
-    private Dictionary<FactionType, float> relations = new Dictionary<FactionType, float>();
-    private List<Ship> ships = new List<Ship>();
-    private List<Port> ports = new List<Port>();
-    public List<Pirate> pirates = new List<Pirate>();
-
-    public IReadOnlyList<Ship> Ships => ships.AsReadOnly();
-    public IReadOnlyList<Port> Ports => ports.AsReadOnly();
-
-    public FactionDefinition(FactionType type, string name)
+    [System.Serializable]
+    public class FactionDefinition
     {
-        Type = type;
-        Name = name;
-    }
-
-    public void SetRelation(FactionType otherFaction, float value)
-    {
-        relations[otherFaction] = value;
-    }
-
-    public float GetRelation(FactionType otherFaction)
-    {
-        return relations.TryGetValue(otherFaction, out float value) ? value : 50f;
-    }
-
-    public void AddShip(Ship ship)
-    {
-        if (!ships.Contains(ship))
+        public FactionType factionType;
+        public string displayName;
+        public List<Pirate> startingPirates = new List<Pirate>();
+        public bool isPlayerFaction;
+        
+        public float startingInfluence = 100f;
+        
+        public Dictionary<FactionType, float> initialRelationships = new Dictionary<FactionType, float>();
+        
+        public void Validate()
         {
-            ships.Add(ship);
+            if (string.IsNullOrEmpty(displayName))
+            {
+                Debug.LogError($"Faction {factionType} has no display name");
+            }
+            
+            if (displayName.Length < FactionConstants.MIN_FACTION_NAME_LENGTH || 
+                displayName.Length > FactionConstants.MAX_FACTION_NAME_LENGTH)
+            {
+                Debug.LogError(string.Format(FactionConstants.ERROR_INVALID_NAME_LENGTH, 
+                    FactionConstants.MIN_FACTION_NAME_LENGTH, 
+                    FactionConstants.MAX_FACTION_NAME_LENGTH));
+            }
+            
+            if (startingInfluence <= 0)
+            {
+                Debug.LogWarning($"Faction {factionType} has invalid starting influence. Setting to default.");
+                startingInfluence = FactionConstants.DEFAULT_INFLUENCE;
+            }
         }
-    }
-
-    public void RemoveShip(Ship ship)
-    {
-        ships.Remove(ship);
-    }
-
-    public void AddPort(Port port)
-    {
-        if (!ports.Contains(port))
-        {
-            ports.Add(port);
-        }
-    }
-
-    public void RemovePort(Port port)
-    {
-        ports.Remove(port);
     }
 }
