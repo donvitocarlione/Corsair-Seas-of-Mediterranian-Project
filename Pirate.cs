@@ -160,7 +160,7 @@ public class Pirate : SeaEntityBase, IShipOwner
         {
             foreach (var ownedShip in ownedShips)
             {
-                if (ownedShip != null && !ReferenceEquals(ownedShip, ship) && ownedShip.IsSelected)
+                if (ownedShip != null && ownedShip != ship && ownedShip.IsSelected)
                 {
                     ownedShip.Deselect();
                 }
