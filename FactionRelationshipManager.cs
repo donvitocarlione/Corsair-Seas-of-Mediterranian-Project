@@ -17,18 +17,23 @@ public class FactionRelationshipManager : MonoBehaviour
     {
         if (FactionManager.Instance != null)
         {
-            FactionManager.Instance.OnRelationChanged += HandleRelationshipChange;
+            FactionManager.Instance.EventSystem.OnFactionChanged += HandleFactionChange;
         }
     }
 
-    private void HandleRelationshipChange(FactionType faction1, FactionType faction2, float newValue)
+    private void HandleFactionChange(FactionType faction, object data, FactionChangeType changeType)
     {
-        foreach (var trigger in relationshipTriggers)
+        if (changeType != FactionChangeType.RelationChanged) return;
+        
+        if (data is float newValue)
         {
-            if (Mathf.Approximately(newValue, trigger.relationshipThreshold))
+            foreach (var trigger in relationshipTriggers)
             {
-                Debug.Log($"Relationship trigger activated: {trigger.eventDescription}");
-                trigger.onTrigger?.Invoke();
+                if (Mathf.Approximately(newValue, trigger.relationshipThreshold))
+                {
+                    Debug.Log($"Relationship trigger activated: {trigger.eventDescription}");
+                    trigger.onTrigger?.Invoke();
+                }
             }
         }
     }
@@ -37,7 +42,7 @@ public class FactionRelationshipManager : MonoBehaviour
     {
         if (FactionManager.Instance != null)
         {
-            FactionManager.Instance.OnRelationChanged -= HandleRelationshipChange;
+            FactionManager.Instance.EventSystem.OnFactionChanged -= HandleFactionChange;
         }
     }
 }
