@@ -10,15 +10,15 @@ public class Buoyancy : MonoBehaviour
     public float waterAngularDrag = 2f;
     
     [Header("Advanced Settings")]
-    public float sideResistance = 3f;  // Resistance to sideways movement
-    public float turningResistance = 2f;  // Resistance to rotation
+    public float sideResistance = 5f;  // Resistance to sideways movement
+    public float turningResistance = 4f;  // Resistance to rotation
     public bool useWaves = true;
     public float waveHeight = 0.5f;
     public float waveFrequency = 1f;
     
     [Header("Stabilization")]
-    public float rollStability = 0.3f;  // How strongly the ship tries to stay upright
-    public float pitchStability = 0.2f;  // How strongly the ship resists pitch changes
+    public float rollStability = 1.5f;  // How strongly the ship tries to stay upright
+    public float pitchStability = 1.2f;  // How strongly the ship resists pitch changes
     
     [Header("Debug Info")]
     public float boatSubmergedPercentage = 0f;
@@ -61,8 +61,8 @@ public class Buoyancy : MonoBehaviour
         rb.mass = 1000f; // 1 ton
         rb.useGravity = true;
         
-        // Allow some rotation for more realistic movement
-        rb.constraints = RigidbodyConstraints.None;
+        // Freeze rotation except for Y-axis
+        rb.constraints = RigidbodyConstraints.FreezeRotationX | RigidbodyConstraints.FreezeRotationZ;
         
         // Random offset for wave variation
         timeOffset = Random.Range(0f, 100f);
@@ -81,6 +81,13 @@ public class Buoyancy : MonoBehaviour
             ApplyBuoyancyForce();
             ApplyWaterResistance();
             ApplyStabilizationForces();
+            
+            // Additional upright force when significantly tilted
+            if (Mathf.Abs(Vector3.Dot(transform.up, Vector3.up)) < 0.5f)
+            {
+                Vector3 uprightForce = Vector3.up * rb.mass * Physics.gravity.magnitude * 2f;
+                rb.AddForce(uprightForce, ForceMode.Force);
+            }
         }
         else
         {
@@ -122,11 +129,11 @@ public class Buoyancy : MonoBehaviour
         float rollFactor = Vector3.Dot(transform.right, Vector3.up);
         
         // Adjust center based on orientation
-        center += transform.right * (rollFactor * boatCollider.bounds.size.x * 0.15f);
-        center += transform.forward * (pitchFactor * boatCollider.bounds.size.z * 0.15f);
+        center += transform.right * (rollFactor * boatCollider.bounds.size.x * 0.1f);
+        center += transform.forward * (pitchFactor * boatCollider.bounds.size.z * 0.1f);
         
         // Lower center of buoyancy for better stability
-        center.y = Mathf.Lerp(boatCollider.bounds.min.y, boatCollider.bounds.center.y, 0.4f);
+        center.y = Mathf.Lerp(boatCollider.bounds.min.y, boatCollider.bounds.center.y, 0.3f);
         
         return center;
     }
@@ -151,14 +158,16 @@ public class Buoyancy : MonoBehaviour
     
     void ApplyStabilizationForces()
     {
-        // Roll stabilization
+        // Roll stabilization with increased force when tilted
         float currentRoll = Vector3.Dot(transform.right, Vector3.up);
-        Vector3 rollCorrection = transform.forward * -currentRoll * rollStability;
+        float rollMultiplier = Mathf.Abs(currentRoll) > 0.5f ? 2f : 1f;
+        Vector3 rollCorrection = transform.forward * -currentRoll * rollStability * rollMultiplier;
         rb.AddTorque(rollCorrection, ForceMode.Force);
         
-        // Pitch stabilization
+        // Pitch stabilization with increased force when tilted
         float currentPitch = Vector3.Dot(transform.forward, Vector3.up);
-        Vector3 pitchCorrection = transform.right * -currentPitch * pitchStability;
+        float pitchMultiplier = Mathf.Abs(currentPitch) > 0.5f ? 2f : 1f;
+        Vector3 pitchCorrection = transform.right * -currentPitch * pitchStability * pitchMultiplier;
         rb.AddTorque(pitchCorrection, ForceMode.Force);
     }
     

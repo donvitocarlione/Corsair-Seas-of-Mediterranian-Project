@@ -77,7 +77,7 @@ public class ShipManager : MonoBehaviour
         Debug.Log("[ShipManager] Initializing manager");
         CreateContainers();
         isInitialized = ValidateConfiguration();
-        
+
         if (!isInitialized)
         {
             Debug.LogError("[ShipManager] Initialization failed");
@@ -89,7 +89,7 @@ public class ShipManager : MonoBehaviour
     {
         shipsParent = new GameObject("Ships").transform;
         shipsParent.parent = transform;
-        
+
         piratesParent = new GameObject("Pirates").transform;
         piratesParent.parent = transform;
         Debug.Log("[ShipManager] Created containers");
@@ -129,9 +129,9 @@ public class ShipManager : MonoBehaviour
         }
     }
 
-   private void InitializeWaterBody()
-   {
-       waterBody = FindAnyObjectByType<WaterBody>();
+    private void InitializeWaterBody()
+    {
+        waterBody = FindAnyObjectByType<WaterBody>();
         if (waterBody == null)
         {
             Debug.LogError("[ShipManager] No WaterBody found in scene!");
@@ -152,7 +152,7 @@ public class ShipManager : MonoBehaviour
 
         playerFaction = playerData.faction;
         Debug.Log($"[ShipManager] Player faction set to: {playerFaction}");
-        
+
         playerInstance = FindAnyObjectByType<Player>();
         if (playerInstance == null)
         {
@@ -162,7 +162,7 @@ public class ShipManager : MonoBehaviour
 
         playerInstance.SetFaction(playerFaction);
         Debug.Log($"[ShipManager] Player instance found and faction set to {playerFaction}");
-        
+
         InitializeAllFactions();
     }
 
@@ -212,7 +212,7 @@ public class ShipManager : MonoBehaviour
             {
                 int shipsPerPirate = data.initialShipCount / data.initialPirateCount;
                 Debug.Log($"[ShipManager] Spawned pirate for faction {data.faction}, assigning {shipsPerPirate} ships");
-                
+
                 for (int j = 0; j < shipsPerPirate; j++)
                 {
                     if (SpawnShipForFaction(data.faction) is Ship ship)
@@ -237,18 +237,18 @@ public class ShipManager : MonoBehaviour
 
         var prefab = data.shipPrefabs[Random.Range(0, data.shipPrefabs.Count)];
         var spawnPos = GetSafeSpawnPosition(data.spawnArea, data.spawnRadius);
-        
+
         Debug.Log($"[ShipManager] Spawning ship at position {spawnPos}");
         var shipObj = Instantiate(prefab, spawnPos, Quaternion.Euler(0, Random.Range(0, 360), 0), shipsParent);
         var ship = shipObj.GetComponent<Ship>();
-        
+
         if (ship != null)
         {
             string shipName = $"{faction}_Ship_{Random.Range(1000, 9999)}";
             ship.Initialize(faction, shipName);
-            
+
             Debug.Log($"[ShipManager] Ship {shipName} initialized for faction {faction} (IsPlayerFaction: {data.isPlayerFaction})");
-            
+
             if (!data.isPlayerFaction && shipObj.GetComponent<AIShipController>() == null)
             {
                 shipObj.AddComponent<AIShipController>().Initialize(ship);
@@ -258,7 +258,7 @@ public class ShipManager : MonoBehaviour
             occupiedPositions.Add(spawnPos);
             return ship;
         }
-        
+
         Debug.LogError($"[ShipManager] Failed to get Ship component from prefab for faction {faction}");
         Destroy(shipObj);
         return null;
@@ -268,7 +268,7 @@ public class ShipManager : MonoBehaviour
     {
         var pirateObj = Instantiate(piratePrefab, Vector3.zero, Quaternion.identity, piratesParent);
         var pirate = pirateObj.GetComponent<Pirate>();
-        
+
         if (pirate == null)
         {
             Debug.LogError("[ShipManager] Pirate prefab missing Pirate component!");
@@ -281,22 +281,40 @@ public class ShipManager : MonoBehaviour
         return pirate;
     }
 
-    private Vector3 GetSafeSpawnPosition(Vector3 center, float radius)
+     private Vector3 GetSafeSpawnPosition(Vector3 center, float radius)
     {
-       if(waterBody == null) return center + Random.insideUnitSphere * radius * 0.5f;
-        float waterLevel = waterBody.GetYBound();
+        if (waterBody == null)
+        {
+            Debug.LogError("[ShipManager] No WaterBody found - cannot determine water level for ship placement!");
+            return center;
+        }
 
+        float waterSurfaceHeight = waterBody.GetWaterSurfaceHeight(); // Use water surface height
         for (int i = 0; i < maxSpawnAttempts; i++)
         {
-            Vector3 randomPos = center + Random.insideUnitSphere * radius;
-            randomPos.y = waterLevel;
-            if (IsSafePosition(randomPos))
+             // Generate random position only in X and Z
+            float randomX = center.x + Random.Range(-radius, radius);
+            float randomZ = center.z + Random.Range(-radius, radius);
+            
+            // Create position vector with exact water surface height
+            Vector3 spawnPosition = new Vector3(randomX, waterSurfaceHeight, randomZ);
+
+            if (IsSafePosition(spawnPosition))
             {
-                return randomPos;
+                Debug.Log($"[ShipManager] Found safe spawn position at {spawnPosition}, water height: {waterSurfaceHeight}");
+                return spawnPosition;
             }
         }
 
-        return center + Random.insideUnitSphere * radius * 0.5f;
+         // Fallback to a position closer to center if no safe position found
+        Vector3 fallbackPosition = new Vector3(
+            center.x + Random.Range(-radius * 0.5f, radius * 0.5f),
+            waterSurfaceHeight,
+            center.z + Random.Range(-radius * 0.5f, radius * 0.5f)
+        );
+        
+        Debug.LogWarning($"[ShipManager] Could not find safe position after {maxSpawnAttempts} attempts. Using fallback position: {fallbackPosition}");
+        return fallbackPosition;
     }
 
     private bool IsSafePosition(Vector3 position)
