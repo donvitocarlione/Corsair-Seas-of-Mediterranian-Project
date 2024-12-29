@@ -64,7 +64,7 @@ public class Pirate : SeaEntityBase, IShipOwner
 
     public override void SetFaction(FactionType newFaction)
     {
-        if (!isInitialized || !object.Equals(newFaction, Faction))
+        if (!isInitialized || !Equals(newFaction, Faction))
         {
             if (isInitialized)
             {
@@ -86,17 +86,14 @@ public class Pirate : SeaEntityBase, IShipOwner
             return;
         }
 
-        var factionData = FactionManager.Instance.GetFactionData(Faction);
-        if (factionData == null)
+        try 
         {
-            Debug.LogError($"No faction data found for faction {Faction}");
-            return;
-        }
-
-        if (!factionData.pirates.Contains(this))
-        {
-            factionData.pirates.Add(this);
+            FactionManager.Instance.RegisterPirate(Faction, this);
             Debug.Log($"Registered pirate with faction {Faction}");
+        }
+        catch (System.ArgumentException e)
+        {
+            Debug.LogError($"Failed to register pirate: {e.Message}");
         }
     }
 
@@ -104,11 +101,14 @@ public class Pirate : SeaEntityBase, IShipOwner
     {
         if (FactionManager.Instance == null) return;
 
-        var factionData = FactionManager.Instance.GetFactionData(Faction);
-        if (factionData != null && factionData.pirates.Contains(this))
+        try
         {
-            factionData.pirates.Remove(this);
+            FactionManager.Instance.UnregisterPirate(Faction, this);
             Debug.Log($"Unregistered pirate from faction {Faction}");
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogWarning($"Error unregistering pirate: {e.Message}");
         }
     }
     
