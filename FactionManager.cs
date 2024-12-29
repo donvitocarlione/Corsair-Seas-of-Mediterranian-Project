@@ -56,6 +56,52 @@ public class FactionManager : MonoBehaviour
         }
     }
 
+        public void RegisterPirate(FactionType faction, Pirate pirate)
+    {
+        if (pirate == null)
+        {
+            throw new ArgumentNullException(nameof(pirate));
+        }
+
+        if (factions.TryGetValue(faction, out FactionDefinition factionData))
+        {
+            // Register all ships owned by the pirate
+            foreach (var ship in pirate.GetOwnedShips())
+            {
+                RegisterShip(faction, ship);
+            }
+            EventSystem.Publish(faction, pirate, FactionChangeType.PirateRegistered);
+            Debug.Log($"Registered pirate to faction {faction}");
+        }
+        else
+        {
+            throw new ArgumentException($"Unknown faction: {faction}", nameof(faction));
+        }
+    }
+
+    public void UnregisterPirate(FactionType faction, Pirate pirate)
+    {
+        if (pirate == null)
+        {
+            throw new ArgumentNullException(nameof(pirate));
+        }
+
+        if (factions.TryGetValue(faction, out FactionDefinition factionData))
+        {
+            // Unregister all ships owned by the pirate
+            foreach (var ship in pirate.GetOwnedShips())
+            {
+                UnregisterShip(faction, ship);
+            }
+            EventSystem.Publish(faction, pirate, FactionChangeType.PirateUnregistered);
+            Debug.Log($"Unregistered pirate from faction {faction}");
+        }
+        else
+        {
+            Debug.LogWarning($"Attempting to unregister pirate from unknown faction: {faction}");
+        }
+    }
+
     protected void InitializeDefaultFaction(FactionType faction)
     {
         var newFaction = new FactionDefinition(
