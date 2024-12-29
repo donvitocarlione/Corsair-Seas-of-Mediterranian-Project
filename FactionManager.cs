@@ -22,26 +22,17 @@ public class FactionManager : MonoBehaviour
         }
     }
 
-    private Dictionary<FactionType, FactionDefinition> factions = new();
+    [SerializeField] private FactionConfiguration configuration;
+    [SerializeField] private List<FactionDefinitionAsset> factionDefinitions;
     
-    // Events
-    public event Action<FactionType, Ship> OnShipRegistered;
-    public event Action<FactionType, Ship> OnShipUnregistered;
-    public event Action<FactionType, FactionType, float> OnRelationChanged;
-    public event Action<FactionType, int> OnInfluenceChanged;
-    public event Action<FactionType, Port> OnPortCaptured;
-
-    // Constants
-    private const float MIN_RELATION = 0f;
-    private const float MAX_RELATION = 100f;
-    private const float NEUTRAL_RELATION = 50f;
-    private const float WAR_THRESHOLD = 25f;
-    private const float ALLY_THRESHOLD = 75f;
-    private const float TRADE_RELATION_MULTIPLIER = 0.1f;
+    public FactionEventSystem EventSystem { get; private set; }
+    
+    private Dictionary<FactionType, FactionDefinition> factions = new();
 
     private void Awake()
     {
         ValidateSingleton();
+        EventSystem = new FactionEventSystem();
         InitializeFactions();
     }
 
@@ -58,11 +49,22 @@ public class FactionManager : MonoBehaviour
 
     private void InitializeFactions()
     {
-        foreach (FactionType faction in Enum.GetValues(typeof(FactionType)))
+        if (factionDefinitions == null || factionDefinitions.Count == 0)
         {
-            if (!factions.ContainsKey(faction))
+            Debug.LogWarning("No Faction definitions found! Initializing default factions");
+            foreach (FactionType faction in Enum.GetValues(typeof(FactionType)))
             {
-                InitializeDefaultFaction(faction);
+                if (!factions.ContainsKey(faction))
+                {
+                    InitializeDefaultFaction(faction);
+                }
+            }
+        }
+        else
+        {
+            foreach (var definition in factionDefinitions)
+            {
+                InitializeFactionFromAsset(definition);
             }
         }
     }
@@ -74,8 +76,8 @@ public class FactionManager : MonoBehaviour
             faction.ToString()
         )
         {
-            Influence = 50,
-            ResourceLevel = 50,
+            Influence = (int)configuration.defaultInfluence,
+            ResourceLevel = (int)configuration.defaultResourceLevel,
             Color = GetDefaultFactionColor(faction),
             BaseLocation = "Unknown"
         };
@@ -83,6 +85,30 @@ public class FactionManager : MonoBehaviour
         factions[faction] = newFaction;
         InitializeFactionRelations(newFaction);
         Debug.Log($"Initialized default faction: {faction}");
+    }
+
+    private void InitializeFactionFromAsset(FactionDefinitionAsset asset)
+    {
+        if (factions.ContainsKey(asset.type))
+        {
+            Debug.LogWarning($"Faction {asset.type} already exists! Skipping initialization.");
+            return;
+        }
+
+        var newFaction = new FactionDefinition(
+            asset.type,
+            asset.displayName
+        )
+        {
+            Influence = asset.initialInfluence,
+            ResourceLevel = asset.initialResourceLevel,
+            Color = asset.color,
+            BaseLocation = asset.baseLocation
+        };
+
+        factions[asset.type] = newFaction;
+        InitializeFactionRelations(newFaction);
+        Debug.Log($"Initialized faction from asset: {asset.displayName} ({asset.type})");
     }
 
     private Color GetDefaultFactionColor(FactionType faction)
@@ -98,40 +124,13 @@ public class FactionManager : MonoBehaviour
         };
     }
 
-    private void InitializeHistoricalFaction(
-        FactionType type,
-        string name,
-        string baseLocation,
-        int influence,
-        int resourceLevel,
-        Color color)
-    {
-        if (factions.ContainsKey(type))
-        {
-            Debug.LogWarning($"Faction {type} already exists! Skipping initialization.");
-            return;
-        }
-
-        var faction = new FactionDefinition(type, name)
-        {
-            BaseLocation = baseLocation,
-            Influence = Mathf.Clamp(influence, 0, 100),
-            ResourceLevel = Mathf.Clamp(resourceLevel, 0, 100),
-            Color = color
-        };
-
-        factions[type] = faction;
-        InitializeFactionRelations(faction);
-        Debug.Log($"Initialized historical faction: {name} ({type})");
-    }
-
     private void InitializeFactionRelations(FactionDefinition faction)
     {
         foreach (FactionType otherFaction in Enum.GetValues(typeof(FactionType)))
         {
             if (faction.Type != otherFaction)
             {
-                faction.SetRelation(otherFaction, NEUTRAL_RELATION);
+                faction.SetRelation(otherFaction, configuration.neutralRelation);
             }
         }
     }
@@ -140,19 +139,18 @@ public class FactionManager : MonoBehaviour
     {
         if (ship == null)
         {
-            Debug.LogError("Attempting to register null ship!");
-            return;
+            throw new ArgumentNullException(nameof(ship));
         }
 
         if (factions.TryGetValue(faction, out FactionDefinition factionData))
         {
             factionData.AddShip(ship);
-            OnShipRegistered?.Invoke(faction, ship);
+            EventSystem.Publish(faction, ship, FactionChangeType.ShipRegistered);
             Debug.Log($"Registered ship {ship.ShipName} to faction {faction}");
         }
         else
         {
-            Debug.LogError($"Attempting to register ship for unknown faction: {faction}");
+            throw new ArgumentException($"Unknown faction: {faction}", nameof(faction));
         }
     }
 
@@ -160,14 +158,13 @@ public class FactionManager : MonoBehaviour
     {
         if (ship == null)
         {
-            Debug.LogError("Attempting to unregister null ship!");
-            return;
+            throw new ArgumentNullException(nameof(ship));
         }
 
         if (factions.TryGetValue(faction, out FactionDefinition factionData))
         {
             factionData.RemoveShip(ship);
-            OnShipUnregistered?.Invoke(faction, ship);
+            EventSystem.Publish(faction, ship, FactionChangeType.ShipUnregistered);
             Debug.Log($"Unregistered ship {ship.ShipName} from faction {faction}");
         }
         else
@@ -180,8 +177,7 @@ public class FactionManager : MonoBehaviour
     {
         if (faction1 == faction2)
         {
-            Debug.LogWarning("Cannot update relation between a faction and itself!");
-            return;
+            throw new ArgumentException("Cannot update relation between a faction and itself!");
         }
 
         var faction1Data = GetFactionData(faction1);
@@ -189,19 +185,19 @@ public class FactionManager : MonoBehaviour
 
         if (faction1Data != null && faction2Data != null)
         {
-            float clampedValue = Mathf.Clamp(newValue, MIN_RELATION, MAX_RELATION);
+            float clampedValue = Mathf.Clamp(newValue, configuration.minRelation, configuration.maxRelation);
             
             faction1Data.SetRelation(faction2, clampedValue);
             faction2Data.SetRelation(faction1, clampedValue);
             
-            OnRelationChanged?.Invoke(faction1, faction2, clampedValue);
+            EventSystem.Publish(faction1, clampedValue, FactionChangeType.RelationChanged);
             
             // Log significant relation changes
-            if (clampedValue <= WAR_THRESHOLD)
+            if (clampedValue <= configuration.warThreshold)
             {
                 Debug.Log($"War conditions between {faction1} and {faction2} (Relation: {clampedValue})");
             }
-            else if (clampedValue >= ALLY_THRESHOLD)
+            else if (clampedValue >= configuration.allyThreshold)
             {
                 Debug.Log($"Alliance formed between {faction1} and {faction2} (Relation: {clampedValue})");
             }
@@ -219,7 +215,7 @@ public class FactionManager : MonoBehaviour
             
             if (oldInfluence != factionData.Influence)
             {
-                OnInfluenceChanged?.Invoke(faction, factionData.Influence);
+                EventSystem.Publish(faction, factionData.Influence, FactionChangeType.InfluenceChanged);
                 Debug.Log($"Updated {faction} influence from {oldInfluence} to {factionData.Influence}");
             }
         }
@@ -231,7 +227,10 @@ public class FactionManager : MonoBehaviour
 
     public void HandlePortCapture(FactionType capturingFaction, Port capturedPort)
     {
-        if (capturedPort == null) return;
+        if (capturedPort == null)
+        {
+            throw new ArgumentNullException(nameof(capturedPort));
+        }
 
         var oldFaction = capturedPort.OwningFaction;
         var oldFactionData = GetFactionData(oldFaction);
@@ -246,15 +245,15 @@ public class FactionManager : MonoBehaviour
         {
             newFactionData.AddPort(capturedPort);
             capturedPort.SetFaction(capturingFaction);
-            OnPortCaptured?.Invoke(capturingFaction, capturedPort);
+            EventSystem.Publish(capturingFaction, capturedPort, FactionChangeType.PortCaptured);
             
             // Update relations and influence
             if (oldFaction != FactionType.None)
             {
                 float currentRelation = GetRelationBetweenFactions(oldFaction, capturingFaction);
-                UpdateFactionRelation(oldFaction, capturingFaction, currentRelation - 20f);
-                ModifyFactionInfluence(oldFaction, -10);
-                ModifyFactionInfluence(capturingFaction, 10);
+                UpdateFactionRelation(oldFaction, capturingFaction, currentRelation - configuration.captureRelationPenalty);
+                ModifyFactionInfluence(oldFaction, -configuration.captureInfluenceChange);
+                ModifyFactionInfluence(capturingFaction, configuration.captureInfluenceChange);
             }
         }
     }
@@ -271,9 +270,9 @@ public class FactionManager : MonoBehaviour
 
         if (faction1Data != null && faction2Data != null)
         {
-            float relationBonus = value * TRADE_RELATION_MULTIPLIER;
+            float relationBonus = value * configuration.tradeRelationMultiplier;
             float currentRelation = faction1Data.GetRelation(faction2);
-            float newRelation = Mathf.Min(currentRelation + relationBonus, MAX_RELATION);
+            float newRelation = Mathf.Min(currentRelation + relationBonus, configuration.maxRelation);
 
             UpdateFactionRelation(faction1, faction2, newRelation);
             Debug.Log($"Trade between {faction1} and {faction2} improved relations by {relationBonus:F1} points");
@@ -286,8 +285,7 @@ public class FactionManager : MonoBehaviour
         {
             return factionData;
         }
-        Debug.LogError($"Attempting to get data for unknown faction: {faction}");
-        return null;
+        throw new ArgumentException($"Unknown faction: {faction}", nameof(faction));
     }
 
     public bool AreFactionsAtWar(FactionType faction1, FactionType faction2)
@@ -297,7 +295,7 @@ public class FactionManager : MonoBehaviour
         var faction1Data = GetFactionData(faction1);
         if (faction1Data == null) return false;
 
-        return faction1Data.GetRelation(faction2) < WAR_THRESHOLD;
+        return faction1Data.GetRelation(faction2) < configuration.warThreshold;
     }
 
     public bool AreFactionsAllied(FactionType faction1, FactionType faction2)
@@ -307,15 +305,15 @@ public class FactionManager : MonoBehaviour
         var faction1Data = GetFactionData(faction1);
         if (faction1Data == null) return false;
 
-        return faction1Data.GetRelation(faction2) >= ALLY_THRESHOLD;
+        return faction1Data.GetRelation(faction2) >= configuration.allyThreshold;
     }
 
     public float GetRelationBetweenFactions(FactionType faction1, FactionType faction2)
     {
-        if (faction1 == faction2) return MAX_RELATION;
+        if (faction1 == faction2) return configuration.maxRelation;
 
         var faction1Data = GetFactionData(faction1);
-        return faction1Data?.GetRelation(faction2) ?? NEUTRAL_RELATION;
+        return faction1Data?.GetRelation(faction2) ?? configuration.neutralRelation;
     }
 
     public IReadOnlyList<Ship> GetFactionShips(FactionType faction)
