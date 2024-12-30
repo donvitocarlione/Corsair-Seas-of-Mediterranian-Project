@@ -24,7 +24,7 @@ public class FactionDefinition : Faction // Inherit from Faction
 
     public FactionDefinition(FactionType type, string name) : base()
     {
-        this.factionType = type;
+        this.Type = type;
         Name = name;
     }
 
