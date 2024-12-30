@@ -17,8 +17,21 @@ public class Player : Pirate
 
     protected override void Start()
     {
+        base.Start(); // Added base.Start() call
+
         // Initialize ship list
         ownedShips ??= new List<Ship>();
+        
+        // Register with ShipManager
+        var shipManager = ShipManager.Instance;
+        if (shipManager != null)
+        {
+            shipManager.RegisterPlayer(this);
+        }
+        else
+        {
+            Debug.LogError("ShipManager not found in scene! Player faction registration will be disabled.");
+        }
 
         // Find InputManager if not assigned
         InitializeInputManager();

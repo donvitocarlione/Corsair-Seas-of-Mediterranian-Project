@@ -45,7 +45,19 @@ public class ShipManager : MonoBehaviour
         }
 
         playerInstance = player;
-        player.RegisterPlayer(); // Explicitly register the player with faction system
+        
+        // Register player with FactionManager first
+        if (factionManager != null)
+        {
+            factionManager.RegisterPirate(player.Faction, player);
+        }
+        
+        // Register all player's ships
+        foreach (var ship in player.GetOwnedShips())
+        {
+            RegisterShip(ship);
+        }
+        
         Debug.Log($"Player registered with ShipManager and faction {player.Faction}");
     }
 
@@ -74,9 +86,20 @@ public class ShipManager : MonoBehaviour
 
         if (!registeredShips.ContainsKey(ship))
         {
-            registeredShips.Add(ship, ship.Faction);
-            factionManager?.RegisterShip(ship.Faction, ship);
-            Debug.Log($"Ship {ship.ShipName} registered with faction {ship.Faction}");
+            // Store the ship's current faction
+            FactionType shipFaction = ship.Faction;
+            registeredShips.Add(ship, shipFaction);
+
+            // Register with FactionManager if available
+            if (factionManager != null)
+            {
+                factionManager.RegisterShip(shipFaction, ship);
+                Debug.Log($"Ship {ship.ShipName} registered with faction {shipFaction}");
+            }
+            else
+            {
+                Debug.LogWarning($"FactionManager not available - Ship {ship.ShipName} registered only with ShipManager");
+            }
         }
     }
 

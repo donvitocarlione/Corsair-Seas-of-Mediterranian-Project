@@ -94,7 +94,7 @@ public class FactionManager : MonoBehaviour
         }
     }
 
-        public void RegisterPirate(FactionType faction, Pirate pirate)
+    public void RegisterPirate(FactionType faction, Pirate pirate)
     {
         if (pirate == null)
         {
@@ -140,23 +140,27 @@ public class FactionManager : MonoBehaviour
         }
     }
 
-    protected void InitializeDefaultFaction(FactionType faction)
+   protected void InitializeDefaultFaction(FactionType faction)
     {
-        var newFaction = new FactionDefinition(
-            faction,
-            faction.ToString()
-        )
+        if (!factions.ContainsKey(faction))
         {
-            Influence = (int)configuration.defaultInfluence,
-            ResourceLevel = (int)configuration.defaultResourceLevel,
-            Color = GetDefaultFactionColor(faction),
-            BaseLocation = "Unknown"
-        };
+            var newFaction = new FactionDefinition(
+                faction,
+                faction.ToString()
+            )
+            {
+                Influence = (int)configuration.defaultInfluence,
+                ResourceLevel = (int)configuration.defaultResourceLevel,
+                Color = GetDefaultFactionColor(faction),
+                BaseLocation = "Unknown"
+            };
 
-        factions[faction] = newFaction;
-        InitializeFactionRelations(newFaction);
-        Debug.Log($"Initialized default faction: {faction}");
+            factions[faction] = newFaction;
+            InitializeFactionRelations(newFaction);
+            Debug.Log($"Initialized default faction: {faction}");
+        }
     }
+
 
     protected void InitializeFactionFromAsset(FactionDefinitionAsset asset)
     {
@@ -209,21 +213,35 @@ public class FactionManager : MonoBehaviour
     public void RegisterShip(FactionType faction, Ship ship)
     {
         if (ship == null)
-        {
             throw new ArgumentNullException(nameof(ship));
-        }
 
+        if (!factions.ContainsKey(faction))
+        {
+            Debug.LogWarning($"Faction {faction} not initialized. Initializing with default values...");
+            InitializeDefaultFaction(faction);
+        }
+        
+        if (ship.Faction != faction)
+        {
+            Debug.LogError($"Ship {ship.ShipName} faction mismatch during registration. Expected {faction}, but ship has {ship.Faction}. Ensure ship's faction is set correctly before registration.");
+            return;
+        }
+        
         if (factions.TryGetValue(faction, out FactionDefinition factionData))
         {
-            factionData.AddShip(ship);
-            EventSystem.Publish(faction, ship, FactionChangeType.ShipRegistered);
-            Debug.Log($"Registered ship {ship.ShipName} to faction {faction}");
+             factionData.AddShip(ship);
+            
+            // Register ship as faction entity
+            RegisterFactionEntity(ship);
+             EventSystem.Publish(faction, ship, FactionChangeType.ShipRegistered);
+            Debug.Log($"Ship {ship.ShipName} registered with faction {faction}");
         }
         else
         {
             throw new ArgumentException($"Unknown faction: {faction}", nameof(faction));
         }
     }
+
 
     public void UnregisterShip(FactionType faction, Ship ship)
     {
@@ -235,6 +253,7 @@ public class FactionManager : MonoBehaviour
         if (factions.TryGetValue(faction, out FactionDefinition factionData))
         {
             factionData.RemoveShip(ship);
+            UnregisterFactionEntity(ship);
             EventSystem.Publish(faction, ship, FactionChangeType.ShipUnregistered);
             Debug.Log($"Unregistered ship {ship.ShipName} from faction {faction}");
         }
