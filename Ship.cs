@@ -72,42 +72,30 @@ public class Ship : SeaEntityBase
         base.Start();
     }
    
-    // Added SetName method
     public virtual void SetName(string newName)
     {
         EntityName = newName;
         Debug.Log($"[Ship] Name set to {newName} for {gameObject.name}");
     }
 
-
-        public void Initialize(FactionType faction, string shipName, IShipOwner owner)
-        {
-            SetFaction(faction);
-            SetName(shipName);
-            SetOwner(owner);
-        }
-
-        // Set name
-        SetName(newName);
-
-        // Ensure FactionManager exists
+    public void Initialize(FactionType faction, string shipName, IShipOwner shipOwner)
+    {
         if (FactionManager.Instance == null)
         {
             Debug.LogError($"[Ship] Cannot initialize - FactionManager not ready");
             return;
         }
 
-        // Set faction and register with manager
-        SetFaction(newFaction);
-        FactionManager.Instance.RegisterShip(newFaction, this);
+        SetName(shipName);
+        SetFaction(faction);
+        FactionManager.Instance.RegisterShip(faction, this);
 
-        if (owner != null)
+        if (shipOwner != null)
         {
-           SetOwner(owner);
+            SetOwner(shipOwner);
         }
 
-
-        Debug.Log($"[Ship] Initialization complete for {newName} with faction {newFaction}");
+        Debug.Log($"[Ship] Initialization complete for {shipName} with faction {faction}");
     }
 
     public virtual void SetOwner(IShipOwner newOwner)
