@@ -35,19 +35,20 @@ public class FactionManager : MonoBehaviour
         Instance = this;
     }
 
-    public void RegisterFactionEntity(Faction entity)
+    public void RegisterFactionEntity(Ship ship)
     {
-        if (entity == null)
-            throw new ArgumentNullException(nameof(entity));
+        if (ship == null)
+            throw new ArgumentNullException(nameof(ship));
 
-        if (!factionEntities.ContainsKey(entity.Type))
+        FactionType type = ship.Faction;
+        if (!factionEntities.ContainsKey(type))
         {
-            factionEntities[entity.Type] = new HashSet<Faction>();
+            factionEntities[type] = new HashSet<Faction>();
         }
 
-        factionEntities[entity.Type].Add(entity);
-        EventSystem.Publish(entity.Type, entity, FactionChangeType.EntityRegistered);
-        Debug.Log($"Registered faction entity: {entity.name} with {entity.Type}");
+        // Handle ship registration separately since it's not a Faction
+        EventSystem.Publish(type, ship, FactionChangeType.EntityRegistered);
+        Debug.Log($"Registered ship entity: {ship.ShipName} with {type}");
     }
 
     public void UnregisterFactionEntity(Faction entity)
