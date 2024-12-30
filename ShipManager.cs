@@ -53,7 +53,7 @@ public class ShipManager : MonoBehaviour
         CreateContainers();
         InitializeWaterBody();
 
-         // Add this block
+        // Add this block
         if (factionManager == null)
         {
             factionManager = GameObject.FindAnyObjectByType<FactionManager>();
@@ -150,6 +150,7 @@ public class ShipManager : MonoBehaviour
     #endregion
 
     #region Ship Spawning
+    //Modified to use Faction Owner instead of just Faction type.
      public Ship SpawnShipForFaction(FactionType faction, Vector3? customPosition = null)
     {
         if (!isInitialized)
@@ -174,7 +175,7 @@ public class ShipManager : MonoBehaviour
         }
         else
         {
-            spawnPosition = GetSafeSpawnPosition(factionData.spawnArea, factionData.spawnRadius); // Corrected GetSafeSpawnPosition parameters
+            spawnPosition = GetSafeSpawnPosition(factionData.spawnArea, factionData.spawnRadius);
             if (spawnPosition == Vector3.zero)
             {
                 Debug.LogWarning($"[ShipManager] No available position found for {faction}. Cannot spawn ship.");
@@ -189,13 +190,18 @@ public class ShipManager : MonoBehaviour
         if (ship != null)
         {
             string shipName = $"{faction}_Ship_{Random.Range(1000, 9999)}";
-            IShipOwner factionOwner = factionManager.GetFactionOwner(faction);
-            ship.Initialize(faction, shipName, factionOwner);
             
-            if (factionManager != null)
+            // Get Pirate owner for the faction
+            Pirate pirateOwner = factionManager.GetFactionOwner(faction) as Pirate;
+            if (pirateOwner == null)
             {
-                factionManager.RegisterShip(faction, ship);
+                Debug.LogError($"[ShipManager] No Pirate Owner found for faction {faction}, ship will not be properly owned.");
+                Destroy(shipInstance);
+                return null;
             }
+             //Initialize ship with correct owner
+            ship.Initialize(faction, shipName, pirateOwner);
+           
         }
         return ship;
     }
@@ -235,7 +241,7 @@ public class ShipManager : MonoBehaviour
         }
         else
         {
-            spawnPosition = GetSafeSpawnPosition(factionData.spawnArea, factionData.spawnRadius);  // Corrected GetSafeSpawnPosition parameters
+            spawnPosition = GetSafeSpawnPosition(factionData.spawnArea, factionData.spawnRadius);
             if (spawnPosition == Vector3.zero)
             {
                 Debug.LogWarning($"[ShipManager] No available position found for {faction}. Cannot spawn pirate ship.");
@@ -248,13 +254,18 @@ public class ShipManager : MonoBehaviour
         Ship ship = shipInstance.GetComponent<Ship>();
         if (ship != null)
         {
-            string shipName = $"{faction}_Pirate_{Random.Range(1000, 9999)}";
-            var factionOwner = factionManager.GetFactionOwner(faction);
-            ship.Initialize(faction, shipName, factionOwner);
-            if (factionManager != null)
-            {
-                factionManager.RegisterShip(faction, ship);
-            }
+             string shipName = $"{faction}_Pirate_{Random.Range(1000, 9999)}";
+             // Get Pirate owner for the faction
+             Pirate pirateOwner = factionManager.GetFactionOwner(faction) as Pirate;
+             if (pirateOwner == null)
+             {
+                Debug.LogError($"[ShipManager] No Pirate Owner found for faction {faction}, ship will not be properly owned.");
+                 Destroy(shipInstance);
+                  return null;
+             }
+            
+            ship.Initialize(faction, shipName, pirateOwner);
+           
 
             Debug.Log($"[ShipManager] Pirate Ship {shipName} initialized and registered for faction {faction}");
         }

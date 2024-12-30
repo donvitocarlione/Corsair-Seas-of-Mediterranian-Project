@@ -330,7 +330,8 @@ public class FactionManager : MonoBehaviour
         FactionType type = ship.Faction;
         if (factionEntities.ContainsKey(type))
         {
-            EventSystem.Publish(type, ship, FactionChangeType.EntityUnregistered);
+            EventSystem.Publish(type, ship,
+            FactionChangeType.EntityUnregistered);
             Debug.Log($"Unregistered ship entity: {ship.ShipName()} from {type}");
         }
     }
