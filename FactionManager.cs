@@ -399,6 +399,18 @@ public class FactionManager : MonoBehaviour
         }
     }
 
+      public Faction GetFactionOwner(FactionType factionType)
+    {
+        // Retrieve the faction data using the FactionType.
+        if (!factions.ContainsKey(factionType))
+        {
+              Debug.LogWarning($"Requested Faction owner for uninitialized faction {factionType}. Returning Null.");
+            return null; // Or create a dummy faction instance if needed
+        }
+
+        return factions[factionType]; // Return the faction definition, acting as a Faction owner
+    }
+
     public FactionDefinition GetFactionData(FactionType faction)
     {
         if (factions.TryGetValue(faction, out FactionDefinition factionData))

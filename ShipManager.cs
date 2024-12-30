@@ -188,7 +188,8 @@ public class ShipManager : MonoBehaviour
         if (ship != null)
         {
             string shipName = $"{faction}_Ship_{Random.Range(1000, 9999)}";
-            ship.Initialize(faction, shipName);
+            var factionOwner = factionManager.GetFactionOwner(faction);
+            ship.Initialize(faction, shipName, factionOwner);  // Pass the faction owner
 
             // Add this line to register the ship with FactionManager
             if (factionManager != null)
@@ -257,7 +258,8 @@ public class ShipManager : MonoBehaviour
         if (ship != null)
         {
             string shipName = $"{faction}_Pirate_{Random.Range(1000, 9999)}";
-            ship.Initialize(faction, shipName);
+            var factionOwner = factionManager.GetFactionOwner(faction);
+            ship.Initialize(faction, shipName, factionOwner);
             if (factionManager != null)
             {
                 factionManager.RegisterShip(faction, ship);
