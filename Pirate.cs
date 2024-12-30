@@ -6,15 +6,21 @@ using static ShipExtensions;
 [AddComponentMenu("Game/Pirate")]
 public class Pirate : SeaEntityBase, IShipOwner
 {
-    protected List<Ship> ownedShips;
+    [Header("Pirate Identity")]
+    [SerializeField] private string pirateName;
+    [SerializeField] private PirateRank rank = PirateRank.Regular;
+
     [SerializeField, Range(0f, 100f), Tooltip("Pirate's reputation affects trading and diplomacy")]
     protected float reputation = 50f;
     [SerializeField, Min(0f), Tooltip("Current wealth in gold coins")]
     protected float wealth = 1000f;
 
+    protected List<Ship> ownedShips;
     private bool isInitialized;
     private const float MIN_REPUTATION = 0f;
     private const float MAX_REPUTATION = 100f;
+
+     public PirateRank Rank => rank;
 
     protected override void Awake()
     {
@@ -52,6 +58,12 @@ public class Pirate : SeaEntityBase, IShipOwner
             }
             ownedShips.Clear();
         }
+    }
+     public void SetRank(PirateRank newRank)
+    {
+        rank = newRank;
+        Debug.Log($"{pirateName}'s rank has been changed to {rank}");
+        // Notify any listeners about rank change, if needed.
     }
 
     public void ModifyReputation(float amount)
@@ -192,3 +204,4 @@ public class Pirate : SeaEntityBase, IShipOwner
         }
     }
 }
+

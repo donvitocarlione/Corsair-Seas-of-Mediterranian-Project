@@ -19,6 +19,10 @@ public class FactionManager : MonoBehaviour
     protected Dictionary<FactionType, FactionDefinition> factions = new();
     private Dictionary<FactionType, HashSet<Faction>> factionEntities = new();
     private Dictionary<FactionType, HashSet<Ship>> factionShips = new(); 
+    
+        // Add new fields for pirate management
+    private Dictionary<FactionType, List<Pirate>> factionPirates = new();
+    private Dictionary<FactionType, Pirate> factionLeaders = new();
 
     protected void Awake()
     {
@@ -99,53 +103,93 @@ public class FactionManager : MonoBehaviour
             }
         }
     }
+     // Add new methods for pirate management
+    public void SetFactionLeader(FactionType faction, Pirate pirate)
+    {
+        if (faction == FactionType.None || faction == FactionType.Independent)
+            return;
+
+        if (factionLeaders.TryGetValue(faction, out Pirate currentLeader))
+        {
+            currentLeader.SetRank(PirateRank.Captain);
+        }
+
+        factionLeaders[faction] = pirate;
+        pirate.SetRank(PirateRank.FactionLeader);
+        Debug.Log($"Set pirate {pirate.name} as the faction leader of {faction}");
+    }
 
 
+    // Modify your existing RegisterPirate method
     public void RegisterPirate(FactionType faction, Pirate pirate)
     {
         if (pirate == null)
-        {
             throw new ArgumentNullException(nameof(pirate));
+        
+         if (!factions.ContainsKey(faction))
+        {
+            Debug.LogWarning($"Faction {faction} not initialized. Initializing with default values...");
+            InitializeDefaultFaction(faction);
+            
+            // Verify initialization was successful
+            if (!factions.ContainsKey(faction))
+            {
+                Debug.LogError($"Failed to initialize faction {faction}");
+                return;
+            }
         }
 
-        if (factions.TryGetValue(faction, out FactionDefinition factionData))
+
+        if (!factionPirates.ContainsKey(faction))
+            factionPirates[faction] = new List<Pirate>();
+
+        if (!factionPirates[faction].Contains(pirate))
         {
-            // Register all ships owned by the pirate
-            foreach (var ship in pirate.GetOwnedShips())
+            factionPirates[faction].Add(pirate);
+             foreach (var ship in pirate.GetOwnedShips())
             {
                 RegisterShip(faction, ship);
             }
             EventSystem.Publish(faction, pirate, FactionChangeType.PirateRegistered);
-            Debug.Log($"Registered pirate to faction {faction}");
+            Debug.Log($"Registered pirate {pirate.name} to faction {faction}");
         }
-        else
+         else
         {
-            throw new ArgumentException($"Unknown faction: {faction}", nameof(faction));
+            Debug.LogWarning($"Attempting to register an already registered pirate {pirate.name} to faction {faction}");
         }
     }
 
-    public void UnregisterPirate(FactionType faction, Pirate pirate)
+
+   public void UnregisterPirate(FactionType faction, Pirate pirate)
     {
         if (pirate == null)
         {
             throw new ArgumentNullException(nameof(pirate));
         }
 
-        if (factions.TryGetValue(faction, out FactionDefinition factionData))
+        if (factionPirates.TryGetValue(faction, out List<Pirate> pirates))
         {
-            // Unregister all ships owned by the pirate
-            foreach (var ship in pirate.GetOwnedShips())
+            if(pirates.Remove(pirate))
             {
-                UnregisterShip(faction, ship);
+               // Unregister all ships owned by the pirate
+                foreach (var ship in pirate.GetOwnedShips())
+                {
+                    UnregisterShip(faction, ship);
+                }
+                EventSystem.Publish(faction, pirate, FactionChangeType.PirateUnregistered);
+                Debug.Log($"Unregistered pirate {pirate.name} from faction {faction}");
             }
-            EventSystem.Publish(faction, pirate, FactionChangeType.PirateUnregistered);
-            Debug.Log($"Unregistered pirate from faction {faction}");
+            else
+            {
+                  Debug.LogWarning($"Attempting to unregister a pirate {pirate.name} that does not exist on faction {faction}");
+            }
         }
         else
         {
             Debug.LogWarning($"Attempting to unregister pirate from unknown faction: {faction}");
         }
     }
+
 
    protected void InitializeDefaultFaction(FactionType faction)
     {
@@ -197,12 +241,12 @@ public class FactionManager : MonoBehaviour
     {
         return faction switch
         {
-            FactionType.Pirates => Color.red,
-            FactionType.Merchants => Color.green,
-            FactionType.RoyalNavy => Color.blue,
-            FactionType.Ottomans => Color.yellow,
-            FactionType.Venetians => Color.magenta,
-            _ => Color.gray
+            FactionType.CaribbeanPirates => Color.red,      // Bright red for Caribbean Pirates
+            FactionType.BarbaryCorsairs => Color.yellow,    // Yellow for Barbary Corsairs
+            FactionType.MediterraneanPirates => Color.blue, // Blue for Mediterranean Pirates
+            FactionType.BlackFlagAlliance => Color.black,   // Black for Black Flag Alliance
+            FactionType.Independent => Color.gray,          // Gray for Independent pirates
+            _ => Color.white                                // White as fallback for None or undefined
         };
     }
 
@@ -481,6 +525,15 @@ public class FactionManager : MonoBehaviour
                 shipSet.Clear();
             }
             factionShips.Clear();
+
+            // Clearing the pirate dictionaries
+            foreach (var pirateList in factionPirates.Values)
+            {
+              pirateList.Clear();
+            }
+             factionPirates.Clear();
+
+            factionLeaders.Clear();
 
             Instance = null;
         }
