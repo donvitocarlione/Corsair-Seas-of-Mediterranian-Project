@@ -1,6 +1,6 @@
 using UnityEngine;
 using System.Collections.Generic;
-using ShipExtensions;
+using static ShipExtensions;
 
 [AddComponentMenu("Game/Player")]
 public class Player : Pirate

@@ -1,7 +1,7 @@
 using UnityEngine;
 using System.Collections.Generic;
 using CSM.Base;
-using ShipExtensions;
+using static ShipExtensions;
 
 [AddComponentMenu("Game/Pirate")]
 public class Pirate : SeaEntityBase, IShipOwner

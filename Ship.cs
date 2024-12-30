@@ -3,6 +3,11 @@ using System.Collections;
 using UnityEngine.Events;
 using CSM.Base;
 
+[RequireComponent(typeof(Rigidbody))]
+[RequireComponent(typeof(Collider))]
+[RequireComponent(typeof(ShipSelectionHandler))]
+[RequireComponent(typeof(Buoyancy))]
+[RequireComponent(typeof(ShipMovement))]
 public class Ship : SeaEntityBase
 {
     [Header("Ship Properties")]
@@ -75,25 +80,38 @@ public class Ship : SeaEntityBase
     }
 
 
-    public virtual void Initialize(FactionType newFaction, string newName)
+    public virtual void Initialize(FactionType newFaction, string newName, IShipOwner owner = null)
     {
         Debug.Log($"[Ship] Initializing {gameObject.name} with faction {newFaction} and name {newName}");
 
-        // First set the name
-        SetName(newName);
-
-        // Ensure FactionManager is ready
-        if (FactionManager.Instance == null)
+        // First validate faction
+        if (newFaction == FactionType.None)
         {
-            Debug.LogError($"[Ship] Cannot initialize {gameObject.name} - FactionManager not ready");
+            Debug.LogError($"[Ship] Cannot initialize with None faction");
             return;
         }
 
-        // Set faction
-        SetFaction(newFaction);
+        // Set name
+        SetName(newName);
 
-        // Verify faction was set correctly
-        Debug.Log($"[Ship] Faction set to {Faction} for {gameObject.name}");
+        // Ensure FactionManager exists
+        if (FactionManager.Instance == null)
+        {
+            Debug.LogError($"[Ship] Cannot initialize - FactionManager not ready");
+            return;
+        }
+
+        // Set faction and register with manager
+        SetFaction(newFaction);
+        FactionManager.Instance.RegisterShip(newFaction, this);
+
+        if (owner != null)
+        {
+           SetOwner(owner);
+        }
+
+
+        Debug.Log($"[Ship] Initialization complete for {newName} with faction {newFaction}");
     }
 
     public virtual void SetOwner(IShipOwner newOwner)

@@ -1,8 +1,9 @@
 using UnityEngine;
 using System.Collections.Generic;
 using System;
-using ShipExtensions;
+using static ShipExtensions;
 
+[DefaultExecutionOrder(-1)]
 [AddComponentMenu("Game/Faction Manager")]
 public class FactionManager : MonoBehaviour
 {
@@ -40,7 +41,7 @@ public class FactionManager : MonoBehaviour
         Instance = this;
     }
 
-    public void RegisterFactionEntity(Ship ship)
+     public void RegisterFactionEntity(Ship ship)
     {
         if (ship == null)
             throw new ArgumentNullException(nameof(ship));
@@ -80,25 +81,25 @@ public class FactionManager : MonoBehaviour
 
     protected void InitializeFactions()
     {
-        if (factionDefinitions == null || factionDefinitions.Count == 0)
-        {
-            Debug.LogWarning("No Faction definitions found! Initializing default factions");
-            foreach (FactionType faction in Enum.GetValues(typeof(FactionType)))
-            {
-                if (!factions.ContainsKey(faction))
-                {
-                    InitializeDefaultFaction(faction);
-                }
-            }
-        }
-        else
+        // Only initialize from assets first if available
+        if (factionDefinitions != null && factionDefinitions.Count > 0)
         {
             foreach (var definition in factionDefinitions)
             {
                 InitializeFactionFromAsset(definition);
             }
         }
+
+        // Then initialize any missing factions with defaults
+        foreach (FactionType faction in Enum.GetValues(typeof(FactionType)))
+        {
+            if (!factions.ContainsKey(faction))
+            {
+                InitializeDefaultFaction(faction);
+            }
+        }
     }
+
 
     public void RegisterPirate(FactionType faction, Pirate pirate)
     {
@@ -452,7 +453,8 @@ public class FactionManager : MonoBehaviour
         var factionData = GetFactionData(faction);
         return factionData?.Color ?? Color.gray;
     }
-        protected void OnDestroy()
+
+    protected void OnDestroy()
     {
         if (Instance == this)
         {
@@ -467,7 +469,7 @@ public class FactionManager : MonoBehaviour
                 shipSet.Clear();
             }
             factionShips.Clear();
-            
+
             Instance = null;
         }
     }

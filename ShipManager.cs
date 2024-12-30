@@ -1,7 +1,7 @@
 using UnityEngine;
 using System.Collections.Generic;
 using System.Linq;
-using ShipExtensions;
+using static ShipExtensions;
 
 [AddComponentMenu("Game/Ship Manager")]
 public class ShipManager : MonoBehaviour
