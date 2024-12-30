@@ -1,6 +1,7 @@
 using UnityEngine;
 using System.Collections.Generic;
 using System.Linq;
+using CSM.Base; // Added namespace
 using static ShipExtensions;
 
 [AddComponentMenu("Game/Ship Manager")]

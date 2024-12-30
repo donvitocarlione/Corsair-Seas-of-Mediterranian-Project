@@ -1,9 +1,9 @@
 using UnityEngine;
 using System.Collections.Generic;
+using CSM.Base; // Added namespace
 
-public class FactionDefinition
+public class FactionDefinition : Faction // Inherit from Faction
 {
-    public FactionType Type { get; }
     public string Name { get; }
     
     // Controlled properties with internal setters
@@ -13,18 +13,18 @@ public class FactionDefinition
     public string BaseLocation { get; internal set; }
 
     private Dictionary<FactionType, float> relations = new();
-    private List<Ship> ships = new();
+   
     private List<Port> ports = new();
     private List<Pirate> pirates = new();
 
     public IReadOnlyDictionary<FactionType, float> Relations => relations;
-    public IReadOnlyList<Ship> Ships => ships.AsReadOnly();
+    public new IReadOnlyList<Ship> GetOwnedShips() => base.ownedShips.AsReadOnly();
     public IReadOnlyList<Port> Ports => ports.AsReadOnly();
     public IReadOnlyList<Pirate> Pirates => pirates.AsReadOnly();
 
-    public FactionDefinition(FactionType type, string name)
+    public FactionDefinition(FactionType type, string name) : base()
     {
-        Type = type;
+        this.factionType = type;
         Name = name;
     }
 
@@ -38,20 +38,20 @@ public class FactionDefinition
         return relations.TryGetValue(otherFaction, out float value) ? value : 50f;
     }
 
-    internal void AddShip(Ship ship)
+    internal new void AddShip(Ship ship)
     {
         if (ship == null) throw new System.ArgumentNullException(nameof(ship));
         
-        if (!ships.Contains(ship))
+        if (!base.ownedShips.Contains(ship))
         {
-            ships.Add(ship);
+            base.AddShip(ship);
         }
     }
 
-    internal void RemoveShip(Ship ship)
+    internal new void RemoveShip(Ship ship)
     {
         if (ship == null) throw new System.ArgumentNullException(nameof(ship));
-        ships.Remove(ship);
+        base.RemoveShip(ship);
     }
 
     internal void AddPort(Port port)
