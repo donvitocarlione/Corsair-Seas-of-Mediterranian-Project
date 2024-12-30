@@ -126,7 +126,7 @@ public class Pirate : SeaEntityBase, IShipOwner
         {
             ownedShips.Add(ship);
             ship.SetOwner(this);
-            ship.Initialize(Faction, ship.Name);
+            ship.Initialize(Faction, ship.Name, this);
             Debug.Log($"Added ship {ship.ShipName()} to {GetType().Name}'s fleet");
         }
     }
@@ -187,7 +187,7 @@ public class Pirate : SeaEntityBase, IShipOwner
         {
             if (ship != null)
             {
-                ship.Initialize(newFaction, ship.Name);
+                ship.Initialize(newFaction, ship.Name, this);
             }
         }
     }
