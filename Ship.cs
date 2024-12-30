@@ -6,7 +6,6 @@ using CSM.Base;
 public class Ship : SeaEntityBase
 {
     [Header("Ship Properties")]
-    [SerializeField] protected float maxHealth = 100f;
     [SerializeField] protected float sinkingThreshold = 20f;
     [SerializeField] protected GameObject waterSplashPrefab;
     [SerializeField] protected float waterFloodRate = 0.1f;
@@ -26,10 +25,16 @@ public class Ship : SeaEntityBase
     public bool IsSelected => isSelected;
     public bool IsSinking => isSinking;
     public IShipOwner ShipOwner => owner;
-    public string ShipName => Name;
 
-    protected virtual void Awake()
+    public override string Name
     {
+        get => EntityName;
+        protected set => EntityName = value;
+    }
+
+    protected override void Awake()
+    {
+        base.Awake();
         Debug.Log($"[Ship] Awake called on {gameObject.name}");
         shipRigidbody = GetComponent<Rigidbody>();
         buoyancyComponent = GetComponent<Buoyancy>();
@@ -61,12 +66,34 @@ public class Ship : SeaEntityBase
         Debug.Log($"[Ship] Start called on {gameObject.name}");
         base.Start();
     }
+   
+    // Added SetName method
+    public virtual void SetName(string newName)
+    {
+        EntityName = newName;
+        Debug.Log($"[Ship] Name set to {newName} for {gameObject.name}");
+    }
+
 
     public virtual void Initialize(FactionType newFaction, string newName)
     {
         Debug.Log($"[Ship] Initializing {gameObject.name} with faction {newFaction} and name {newName}");
-        SetFaction(newFaction);
+
+        // First set the name
         SetName(newName);
+
+        // Ensure FactionManager is ready
+        if (FactionManager.Instance == null)
+        {
+            Debug.LogError($"[Ship] Cannot initialize {gameObject.name} - FactionManager not ready");
+            return;
+        }
+
+        // Set faction
+        SetFaction(newFaction);
+
+        // Verify faction was set correctly
+        Debug.Log($"[Ship] Faction set to {Faction} for {gameObject.name}");
     }
 
     public virtual void SetOwner(IShipOwner newOwner)
@@ -124,8 +151,8 @@ public class Ship : SeaEntityBase
         {
             currentHealth = Mathf.Max(0, currentHealth - Time.deltaTime);
 
-            if (waterSplashPrefab != null && 
-                Random.value < waterFloodRate * Time.deltaTime && 
+            if (waterSplashPrefab != null &&
+                Random.value < waterFloodRate * Time.deltaTime &&
                 buoyancyComponent != null)
             {
                 Vector3 splashPosition = transform.position + Random.insideUnitSphere * 2f;
@@ -142,18 +169,18 @@ public class Ship : SeaEntityBase
     protected virtual void HandleShipDestroyed()
     {
         if (shipRigidbody != null) shipRigidbody.isKinematic = true;
-        
+
         foreach (var renderer in GetComponentsInChildren<Renderer>())
         {
             renderer.enabled = false;
         }
-        
+
         if (isSelected) Deselect();
         ClearOwner();
-        
+
         OnShipDestroyed?.Invoke();
         Debug.Log($"Ship {Name} has been destroyed!");
-        
+
         ShipManager.Instance?.OnShipDestroyed(this);
     }
 

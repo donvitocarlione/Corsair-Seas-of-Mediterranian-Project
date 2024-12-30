@@ -2,6 +2,8 @@ using UnityEngine;
 using System.Collections.Generic;
 using System;
 
+
+
 [AddComponentMenu("Game/Faction Manager")]
 public class FactionManager : MonoBehaviour
 {
@@ -16,12 +18,16 @@ public class FactionManager : MonoBehaviour
     
     protected Dictionary<FactionType, FactionDefinition> factions = new();
     private Dictionary<FactionType, HashSet<Faction>> factionEntities = new();
+    private Dictionary<FactionType, HashSet<Ship>> factionShips = new(); 
 
     protected void Awake()
     {
         ValidateSingleton();
         EventSystem = new FactionEventSystem();
         InitializeFactions();
+        
+        // Add debug logging to verify initialization
+        Debug.Log($"Initialized factions: {string.Join(", ", factions.Keys)}");
     }
 
     protected void ValidateSingleton()
@@ -216,32 +222,39 @@ public class FactionManager : MonoBehaviour
         if (ship == null)
             throw new ArgumentNullException(nameof(ship));
 
+        // Check if faction exists and initialize if needed
         if (!factions.ContainsKey(faction))
         {
             Debug.LogWarning($"Faction {faction} not initialized. Initializing with default values...");
             InitializeDefaultFaction(faction);
+            
+            // Verify initialization was successful
+            if (!factions.ContainsKey(faction))
+            {
+                Debug.LogError($"Failed to initialize faction {faction}");
+                return;
+            }
         }
         
-        if (ship.Faction != faction)
+        // Verify the faction is properly initialized
+        var factionData = factions[faction];
+        if (factionData == null)
         {
-            Debug.LogError($"Ship {ship.ShipName} faction mismatch during registration. Expected {faction}, but ship has {ship.Faction}. Ensure ship's faction is set correctly before registration.");
+            Debug.LogError($"Faction {faction} exists but has null data");
             return;
         }
-        
-        if (factions.TryGetValue(faction, out FactionDefinition factionData))
+
+        if (ship.Faction != faction)
         {
-             factionData.AddShip(ship);
-            
-            // Register ship as faction entity
-            RegisterFactionEntity(ship);
-             EventSystem.Publish(faction, ship, FactionChangeType.ShipRegistered);
-            Debug.Log($"Ship {ship.ShipName} registered with faction {faction}");
+            Debug.LogError($"Ship {ship.ShipName} faction mismatch during registration. Expected {faction}, but ship has {ship.Faction}");
+            return;
         }
-        else
-        {
-            throw new ArgumentException($"Unknown faction: {faction}", nameof(faction));
-        }
-    }
+
+    factionData.AddShip(ship);
+    RegisterFactionEntity(ship);
+    EventSystem.Publish(faction, ship, FactionChangeType.ShipRegistered);
+    Debug.Log($"Ship {ship.ShipName} registered with faction {faction}");
+}
 
 
     public void UnregisterShip(FactionType faction, Ship ship)
@@ -254,7 +267,7 @@ public class FactionManager : MonoBehaviour
         if (factions.TryGetValue(faction, out FactionDefinition factionData))
         {
             factionData.RemoveShip(ship);
-            UnregisterFactionEntity(ship);
+            UnregisterShipEntity(ship);  // Use the new method here
             EventSystem.Publish(faction, ship, FactionChangeType.ShipUnregistered);
             Debug.Log($"Unregistered ship {ship.ShipName} from faction {faction}");
         }
@@ -263,6 +276,22 @@ public class FactionManager : MonoBehaviour
             Debug.LogWarning($"Attempting to unregister ship from unknown faction: {faction}");
         }
     }
+
+
+    public void UnregisterShipEntity(Ship ship)
+    {
+        if (ship == null)
+            throw new ArgumentNullException(nameof(ship));
+
+        FactionType type = ship.Faction;
+        if (factionEntities.ContainsKey(type))
+        {
+            EventSystem.Publish(type, ship, FactionChangeType.EntityUnregistered);
+            Debug.Log($"Unregistered ship entity: {ship.ShipName} from {type}");
+        }
+    }
+
+
 
     public void UpdateFactionRelation(FactionType faction1, FactionType faction2, float newValue)
     {
@@ -424,17 +453,21 @@ public class FactionManager : MonoBehaviour
         var factionData = GetFactionData(faction);
         return factionData?.Color ?? Color.gray;
     }
-
-    protected void OnDestroy()
+        protected void OnDestroy()
     {
         if (Instance == this)
         {
-            // Clear all registered entities
             foreach (var entitySet in factionEntities.Values)
             {
                 entitySet.Clear();
             }
             factionEntities.Clear();
+
+            foreach (var shipSet in factionShips.Values)
+            {
+                shipSet.Clear();
+            }
+            factionShips.Clear();
             
             Instance = null;
         }

@@ -15,11 +15,12 @@ public class Pirate : SeaEntityBase, IShipOwner
     private const float MIN_REPUTATION = 0f;
     private const float MAX_REPUTATION = 100f;
 
-    protected virtual void Awake()
+    protected override void Awake()
     {
+        base.Awake();
         ownedShips = new List<Ship>();
     }
-    
+
     protected override void Start()
     {
         base.Start();
@@ -70,7 +71,7 @@ public class Pirate : SeaEntityBase, IShipOwner
             {
                 UnregisterFromFaction();
             }
-            
+
             base.SetFaction(newFaction);
             RegisterWithFaction();
             isInitialized = true;
@@ -86,7 +87,7 @@ public class Pirate : SeaEntityBase, IShipOwner
             return;
         }
 
-        try 
+        try
         {
             FactionManager.Instance.RegisterPirate(Faction, this);
             Debug.Log($"Registered pirate with faction {Faction}");
@@ -111,10 +112,10 @@ public class Pirate : SeaEntityBase, IShipOwner
             Debug.LogWarning($"Error unregistering pirate: {e.Message}");
         }
     }
-    
+
     public virtual void AddShip(Ship ship)
     {
-        if (ship == null)
+        if (ReferenceEquals(ship, null))
         {
             Debug.LogError("Attempting to add a null ship!");
             return;
@@ -124,8 +125,8 @@ public class Pirate : SeaEntityBase, IShipOwner
         {
             ownedShips.Add(ship);
             ship.SetOwner(this);
-            ship.Initialize(Faction, ship.ShipName);
-            Debug.Log($"Added ship {ship.ShipName} to {GetType().Name}'s fleet");
+            ship.Initialize(Faction, ship.Name);
+            Debug.Log($"Added ship {ship.Name} to {GetType().Name}'s fleet");
         }
     }
 
@@ -144,7 +145,7 @@ public class Pirate : SeaEntityBase, IShipOwner
             {
                 ship.ClearOwner();
             }
-            Debug.Log($"Removed ship {ship.ShipName} from {GetType().Name}'s fleet");
+            Debug.Log($"Removed ship {ship.Name} from {GetType().Name}'s fleet");
         }
     }
 
@@ -179,13 +180,13 @@ public class Pirate : SeaEntityBase, IShipOwner
         Debug.Log($"{GetType().Name}'s faction changed to {newFaction}");
 
         if (ownedShips == null) return;
-        
+
         // Update faction for all owned ships
         foreach (var ship in ownedShips.ToArray())
         {
             if (ship != null)
             {
-                ship.Initialize(newFaction, ship.ShipName);
+                ship.Initialize(newFaction, ship.Name);
             }
         }
     }

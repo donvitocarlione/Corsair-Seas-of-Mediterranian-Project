@@ -103,7 +103,7 @@ public class ShipSelectionUI : MonoBehaviour
         var text = button.GetComponentInChildren<Text>();
         if (text != null)
         {
-            text.text = ship.Name;
+            text.text = ship.Name;  // Accessing the Name property correctly now
         }
         else
         {
@@ -141,7 +141,7 @@ public class ShipSelectionUI : MonoBehaviour
 
     public void UpdateSelection(Ship selectedShip)
     {
-        if (selectedShip == null)
+       if (selectedShip == null)
         {
             Debug.LogWarning("UpdateSelection called with null ship!");
             return;
