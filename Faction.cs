@@ -1,12 +1,13 @@
 using UnityEngine;
 using System.Collections.Generic;
-using CSM.Base; // Added namespace
+using CSM.Base;
 
 [AddComponentMenu("Game/Faction")]
 public class Faction : MonoBehaviour, IShipOwner
 {
     [SerializeField] private FactionType factionType;
-    public FactionType Type => factionType;
+    public FactionType Type { get => factionType; protected set => factionType = value; }
+    public IReadOnlyList<Ship> Ships => GetOwnedShips().AsReadOnly();
     
     protected List<Ship> ownedShips = new List<Ship>();
 
