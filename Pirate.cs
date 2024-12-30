@@ -1,6 +1,7 @@
 using UnityEngine;
 using System.Collections.Generic;
 using CSM.Base;
+using ShipExtensions;
 
 [AddComponentMenu("Game/Pirate")]
 public class Pirate : SeaEntityBase, IShipOwner
@@ -126,7 +127,7 @@ public class Pirate : SeaEntityBase, IShipOwner
             ownedShips.Add(ship);
             ship.SetOwner(this);
             ship.Initialize(Faction, ship.Name);
-            Debug.Log($"Added ship {ship.Name} to {GetType().Name}'s fleet");
+            Debug.Log($"Added ship {ship.ShipName()} to {GetType().Name}'s fleet");
         }
     }
 
@@ -141,11 +142,11 @@ public class Pirate : SeaEntityBase, IShipOwner
         if (ownedShips.Contains(ship))
         {
             ownedShips.Remove(ship);
-            if (ship.ShipOwner == this)
+            if (ReferenceEquals(ship.ShipOwner, this))
             {
                 ship.ClearOwner();
             }
-            Debug.Log($"Removed ship {ship.Name} from {GetType().Name}'s fleet");
+            Debug.Log($"Removed ship {ship.ShipName()} from {GetType().Name}'s fleet");
         }
     }
 

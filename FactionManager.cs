@@ -1,8 +1,7 @@
 using UnityEngine;
 using System.Collections.Generic;
 using System;
-
-
+using ShipExtensions;
 
 [AddComponentMenu("Game/Faction Manager")]
 public class FactionManager : MonoBehaviour
@@ -54,7 +53,7 @@ public class FactionManager : MonoBehaviour
 
         // Handle ship registration separately since it's not a Faction
         EventSystem.Publish(type, ship, FactionChangeType.EntityRegistered);
-        Debug.Log($"Registered ship entity: {ship.ShipName} with {type}");
+        Debug.Log($"Registered ship entity: {ship.ShipName()} with {type}");
     }
 
     public void UnregisterFactionEntity(Faction entity)
@@ -246,14 +245,14 @@ public class FactionManager : MonoBehaviour
 
         if (ship.Faction != faction)
         {
-            Debug.LogError($"Ship {ship.ShipName} faction mismatch during registration. Expected {faction}, but ship has {ship.Faction}");
+            Debug.LogError($"Ship {ship.ShipName()} faction mismatch during registration. Expected {faction}, but ship has {ship.Faction}");
             return;
         }
 
     factionData.AddShip(ship);
     RegisterFactionEntity(ship);
     EventSystem.Publish(faction, ship, FactionChangeType.ShipRegistered);
-    Debug.Log($"Ship {ship.ShipName} registered with faction {faction}");
+    Debug.Log($"Ship {ship.ShipName()} registered with faction {faction}");
 }
 
 
@@ -269,7 +268,7 @@ public class FactionManager : MonoBehaviour
             factionData.RemoveShip(ship);
             UnregisterShipEntity(ship);  // Use the new method here
             EventSystem.Publish(faction, ship, FactionChangeType.ShipUnregistered);
-            Debug.Log($"Unregistered ship {ship.ShipName} from faction {faction}");
+            Debug.Log($"Unregistered ship {ship.ShipName()} from faction {faction}");
         }
         else
         {
@@ -287,7 +286,7 @@ public class FactionManager : MonoBehaviour
         if (factionEntities.ContainsKey(type))
         {
             EventSystem.Publish(type, ship, FactionChangeType.EntityUnregistered);
-            Debug.Log($"Unregistered ship entity: {ship.ShipName} from {type}");
+            Debug.Log($"Unregistered ship entity: {ship.ShipName()} from {type}");
         }
     }
 

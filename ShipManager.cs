@@ -1,6 +1,7 @@
 using UnityEngine;
 using System.Collections.Generic;
 using System.Linq;
+using ShipExtensions;
 
 [AddComponentMenu("Game/Ship Manager")]
 public class ShipManager : MonoBehaviour
@@ -250,7 +251,7 @@ public class ShipManager : MonoBehaviour
             Debug.Log($"[ShipManager] Pirate Ship {shipName} initialized and registered for faction {faction}");
         }
         else
-        {
+                {
             Debug.LogError($"[ShipManager] Could not find Ship component on prefab!");
             Destroy(shipInstance);
         }
@@ -362,11 +363,11 @@ public class ShipManager : MonoBehaviour
             if (factionManager != null)
             {
                 factionManager.RegisterShip(shipFaction, ship);
-                Debug.Log($"Ship {ship.ShipName} registered with faction {shipFaction}");
+                Debug.Log($"Ship {ship.ShipName()} registered with faction {shipFaction}");
             }
             else
             {
-                Debug.LogWarning($"FactionManager not available - Ship {ship.ShipName} registered only with ShipManager");
+                Debug.LogWarning($"FactionManager not available - Ship {ship.ShipName()} registered only with ShipManager");
             }
         }
     }
@@ -383,7 +384,7 @@ public class ShipManager : MonoBehaviour
             if (factionManager != null)
             {
                 factionManager.UnregisterShip(faction, ship);
-                Debug.Log($"Ship {ship.ShipName} unregistered from faction {faction}");
+                Debug.Log($"Ship {ship.ShipName()} unregistered from faction {faction}");
             }
         }
     }
@@ -394,7 +395,7 @@ public class ShipManager : MonoBehaviour
         {
             UnregisterShip(ship);
             occupiedPositions.Remove(ship.transform.position);
-            Debug.Log($"[ShipManager] Ship {ship.ShipName} destroyed, removing from occupied positions");
+             Debug.Log($"[ShipManager] Ship {ship.ShipName()} destroyed, removing from occupied positions");
         }
     }
 
