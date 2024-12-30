@@ -80,15 +80,11 @@ public class Ship : SeaEntityBase
     }
 
 
-    public virtual void Initialize(FactionType newFaction, string newName, IShipOwner owner = null)
-    {
-        Debug.Log($"[Ship] Initializing {gameObject.name} with faction {newFaction} and name {newName}");
-
-        // First validate faction
-        if (newFaction == FactionType.None)
+        public void Initialize(FactionType faction, string shipName, IShipOwner owner)
         {
-            Debug.LogError($"[Ship] Cannot initialize with None faction");
-            return;
+            SetFaction(faction);
+            SetName(shipName);
+            SetOwner(owner);
         }
 
         // Set name

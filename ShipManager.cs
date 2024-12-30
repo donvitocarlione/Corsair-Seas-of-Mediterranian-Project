@@ -188,24 +188,14 @@ public class ShipManager : MonoBehaviour
         if (ship != null)
         {
             string shipName = $"{faction}_Ship_{Random.Range(1000, 9999)}";
-            var factionOwner = factionManager.GetFactionOwner(faction);
-            ship.Initialize(faction, shipName, factionOwner);  // Pass the faction owner
-
-            // Add this line to register the ship with FactionManager
+            IShipOwner factionOwner = factionManager.GetFactionOwner(faction);
+            ship.Initialize(faction, shipName, factionOwner);
+            
             if (factionManager != null)
             {
                 factionManager.RegisterShip(faction, ship);
             }
-
-
-            Debug.Log($"[ShipManager] Ship {shipName} initialized and registered for faction {faction}");
         }
-        else
-        {
-            Debug.LogError($"[ShipManager] Could not find Ship component on prefab!");
-            Destroy(shipInstance);
-        }
-
         return ship;
     }
 
