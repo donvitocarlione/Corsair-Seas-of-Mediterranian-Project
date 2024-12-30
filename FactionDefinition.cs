@@ -1,8 +1,8 @@
 using UnityEngine;
 using System.Collections.Generic;
-using CSM.Base; // Added namespace
+using CSM.Base;
 
-public class FactionDefinition : Faction // Inherit from Faction
+public class FactionDefinition : Faction
 {
     public string Name { get; }
     
@@ -18,13 +18,12 @@ public class FactionDefinition : Faction // Inherit from Faction
     private List<Pirate> pirates = new();
 
     public IReadOnlyDictionary<FactionType, float> Relations => relations;
-    public new IReadOnlyList<Ship> GetOwnedShips() => base.ownedShips.AsReadOnly();
     public IReadOnlyList<Port> Ports => ports.AsReadOnly();
     public IReadOnlyList<Pirate> Pirates => pirates.AsReadOnly();
 
     public FactionDefinition(FactionType type, string name) : base()
     {
-        this.Type = type;
+        base.Type = type;
         Name = name;
     }
 
