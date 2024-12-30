@@ -208,13 +208,28 @@ public class ShipManager : MonoBehaviour
         return ship;
     }
 
-    public Ship SpawnPirateShip(FactionType faction, Vector3? customPosition = null)
+     public Ship SpawnPirateShip(FactionType faction, Vector3? customPosition = null)
     {
         if (!isInitialized)
         {
             Debug.LogError($"[ShipManager] Cannot spawn pirate ship. Manager is not initialized.");
             return null;
         }
+
+        //Add this block
+        if (piratePrefab == null)
+        {
+            Debug.LogError("[ShipManager] Pirate prefab not assigned!");
+            return null;
+        }
+        
+        if (!piratePrefab.GetComponent<Ship>())
+        {
+             Debug.LogError("[ShipManager] Pirate prefab must have Ship component!");
+            return null;
+        }
+
+
         var factionData = GetFactionShipData(faction);
         if (factionData == null)
         {
