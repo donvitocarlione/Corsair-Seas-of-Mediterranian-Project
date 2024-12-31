@@ -83,25 +83,20 @@ public class FactionManager : MonoBehaviour
         return new HashSet<Faction>();
     }
 
-    protected void InitializeFactions()
+    protected void InitializeFaction(FactionDefinitionAsset asset)
     {
-        // Only initialize from assets first if available
-        if (factionDefinitions != null && factionDefinitions.Count > 0)
-        {
-            foreach (var definition in factionDefinitions)
-            {
-                InitializeFactionFromAsset(definition);
-            }
-        }
-
-        // Then initialize any missing factions with defaults
-        foreach (FactionType faction in Enum.GetValues(typeof(FactionType)))
-        {
-            if (!factions.ContainsKey(faction))
-            {
-                InitializeDefaultFaction(faction);
-            }
-        }
+        if (asset == null) return;
+        
+        // Create the basic faction data
+        var newFaction = new FactionDefinition(asset.type, asset.displayName);
+        factions[asset.type] = newFaction;
+        
+        // Initialize containers for ships and pirates
+        if (!factionPirates.ContainsKey(asset.type))
+            factionPirates[asset.type] = new List<Pirate>();
+            
+        if (!factionShips.ContainsKey(asset.type))
+            factionShips[asset.type] = new HashSet<Ship>();
     }
      // Add new methods for pirate management
     public void SetFactionLeader(FactionType faction, Pirate pirate)
@@ -444,16 +439,29 @@ public class FactionManager : MonoBehaviour
         }
     }
 
-      public Faction GetFactionOwner(FactionType factionType)
+    public Pirate GetFactionOwner(FactionType factionType)
     {
-        // Retrieve the faction data using the FactionType.
-        if (!factions.ContainsKey(factionType))
+        // First try to get the faction leader
+        if (factionLeaders.TryGetValue(factionType, out Pirate leader))
         {
-              Debug.LogWarning($"Requested Faction owner for uninitialized faction {factionType}. Returning Null.");
-            return null; // Or create a dummy faction instance if needed
+            return leader;
         }
 
-        return factions[factionType]; // Return the faction definition, acting as a Faction owner
+        // If no leader exists, try to get the first pirate of that faction
+        if (factionPirates.TryGetValue(factionType, out var pirates) && pirates.Count > 0)
+        {
+            return pirates[0];
+        }
+
+        Debug.LogWarning($"No Pirate owner found for faction {factionType}. Creating a new one...");
+        
+        // Create a new pirate for the faction if none exists
+        GameObject pirateObject = new GameObject($"{factionType}_Leader");
+        Pirate newPirate = pirateObject.AddComponent<Pirate>();
+        newPirate.SetFaction(factionType);
+        SetFactionLeader(factionType, newPirate);
+        
+        return newPirate;
     }
 
     public FactionDefinition GetFactionData(FactionType faction)

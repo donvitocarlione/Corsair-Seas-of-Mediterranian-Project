@@ -192,10 +192,10 @@ public class ShipManager : MonoBehaviour
             string shipName = $"{faction}_Ship_{Random.Range(1000, 9999)}";
             
             // Get Pirate owner for the faction
-            Pirate pirateOwner = factionManager.GetFactionOwner(faction) as Pirate;
+            Pirate pirateOwner = factionManager.GetFactionOwner(faction);
             if (pirateOwner == null)
             {
-                Debug.LogError($"[ShipManager] No Pirate Owner found for faction {faction}, ship will not be properly owned.");
+                Debug.LogError($"[ShipManager] Could not get or create Pirate owner for faction {faction}");
                 Destroy(shipInstance);
                 return null;
             }
@@ -256,10 +256,10 @@ public class ShipManager : MonoBehaviour
         {
              string shipName = $"{faction}_Pirate_{Random.Range(1000, 9999)}";
              // Get Pirate owner for the faction
-             Pirate pirateOwner = factionManager.GetFactionOwner(faction) as Pirate;
+             Pirate pirateOwner = factionManager.GetFactionOwner(faction);
              if (pirateOwner == null)
              {
-                Debug.LogError($"[ShipManager] No Pirate Owner found for faction {faction}, ship will not be properly owned.");
+                Debug.LogError($"[ShipManager] Could not get or create Pirate owner for faction {faction}");
                  Destroy(shipInstance);
                   return null;
              }
