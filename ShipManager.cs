@@ -1,9 +1,12 @@
 using UnityEngine;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using CSM.Base; // Added namespace
 using static ShipExtensions;
 using System.Collections;
+
+using Random = UnityEngine.Random;  // Add this at the top with your other using statements
 
 [AddComponentMenu("Game/Ship Manager")]
 public class ShipManager : MonoBehaviour
