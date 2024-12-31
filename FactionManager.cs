@@ -12,7 +12,7 @@ public class FactionManager : MonoBehaviour
     [SerializeField] protected FactionConfiguration _configuration;
     public FactionConfiguration configuration => _configuration;
 
-    [SerializeField] protected List<FactionDefinitionAsset> factionDefinitions;
+    [SerializeField] private FactionDefinitionAsset[] factionDefinitions;
 
     public FactionEventSystem EventSystem { get; protected set; }
 
@@ -24,14 +24,27 @@ public class FactionManager : MonoBehaviour
     private Dictionary<FactionType, List<Pirate>> factionPirates = new();
     private Dictionary<FactionType, Pirate> factionLeaders = new();
 
-    protected void Awake()
-    {
-        ValidateSingleton();
-        EventSystem = new FactionEventSystem();
-        InitializeFactions();
+     private Dictionary<FactionType, FactionDefinition> factionData;
 
-        // Add debug logging to verify initialization
-        Debug.Log($"Initialized factions: {string.Join(", ", factions.Keys)}");
+
+     protected void Awake()
+    {
+          ValidateSingleton();
+        EventSystem = new FactionEventSystem();
+
+        // Initialize dictionary before anything else
+         factionData = new Dictionary<FactionType, FactionDefinition>();
+
+        // Load and validate all faction definitions first
+        InitializeFactionData();
+
+        // Log validation message
+        ValidateAndLogFactionData();
+        
+        // Initialize factions after data setup
+        InitializeFactions();
+         
+          Debug.Log($"[FactionManager] Initialized factions: {string.Join(", ", factions.Keys)}");
     }
 
     protected void ValidateSingleton()
@@ -43,6 +56,56 @@ public class FactionManager : MonoBehaviour
             return;
         }
         Instance = this;
+    }
+
+       private void InitializeFactionData()
+    {
+        // Clear any existing data
+        factionData.Clear();
+
+        // Verify we have faction definitions assigned
+        if (factionDefinitions == null || factionDefinitions.Length == 0)
+        {
+            Debug.LogError("[FactionManager] No faction definitions assigned! Please assign them in the Unity Inspector.");
+            return;
+        }
+
+        // Load each faction definition
+        foreach (var definitionAsset in factionDefinitions)
+        {
+            if (definitionAsset == null)
+            {
+                Debug.LogError("[FactionManager] Null faction definition found!");
+                continue;
+            }
+
+            var definition = definitionAsset.GetDefinition();
+            if (!factionData.ContainsKey(definition.FactionType))
+            {
+                factionData.Add(definition.FactionType, definition);
+                Debug.Log($"[FactionManager] Initialized faction data: {definition.FactionType}");
+            }
+            else
+            {
+                Debug.LogWarning($"[FactionManager] Duplicate faction type found: {definition.FactionType}");
+            }
+        }
+    }
+
+      private void ValidateAndLogFactionData()
+    {
+        // Log all initialized factions
+        var initializedFactions = string.Join(", ", factionData.Keys);
+        Debug.Log($"[FactionManager] Initialized faction data: {initializedFactions}");
+
+        // Verify all enum values are covered
+        foreach (FactionType factionType in Enum.GetValues(typeof(FactionType)))
+        {
+            if (!factionData.ContainsKey(factionType))
+            {
+                Debug.LogError($"[FactionManager] Missing definition for faction: {factionType}");
+            }
+        }
     }
 
     public void RegisterFactionEntity(Ship ship)
@@ -122,7 +185,7 @@ public class FactionManager : MonoBehaviour
 
         if (!factions.ContainsKey(faction))
         {
-            Debug.LogWarning($"Faction {faction} not initialized. Initializing with default values...");
+             Debug.LogWarning($"Faction {faction} not initialized. Initializing with default values...");
             InitializeDefaultFaction(faction);
 
             // Verify initialization was successful
@@ -189,7 +252,7 @@ public class FactionManager : MonoBehaviour
     {
         if (!factions.ContainsKey(faction))
         {
-            var newFaction = new FactionDefinition(
+             var newFaction = new FactionDefinition(
                 faction,
                 faction.ToString()
             )
@@ -199,9 +262,9 @@ public class FactionManager : MonoBehaviour
                 Color = GetDefaultFactionColor(faction),
                 BaseLocation = "Unknown"
             };
-
+             
             factions[faction] = newFaction;
-            InitializeFactionRelations(newFaction);
+             InitializeFactionRelations(newFaction);
             Debug.Log($"Initialized default faction: {faction}");
         }
     }
@@ -257,7 +320,7 @@ public class FactionManager : MonoBehaviour
 
     public void RegisterShip(FactionType faction, Ship ship)
     {
-        if (ship == null)
+         if (ship == null)
             throw new ArgumentNullException(nameof(ship));
 
         // Check if faction exists and initialize if needed
@@ -464,15 +527,19 @@ public class FactionManager : MonoBehaviour
         return newPirate;
     }
 
+
     public FactionDefinition GetFactionData(FactionType faction)
-    {
-        if (factions.TryGetValue(faction, out FactionDefinition factionData))
-        {
+     {
+           if (factions.TryGetValue(faction, out FactionDefinition factionData))
+         {
             return factionData;
         }
-        throw new ArgumentException($"Unknown faction: {faction}", nameof(faction));
+           if (this.factionData.TryGetValue(faction, out FactionDefinition data))
+        {
+            return data;
+        }
+         throw new ArgumentException($"Unknown faction: {faction}", nameof(faction));
     }
-
     public bool AreFactionsAtWar(FactionType faction1, FactionType faction2)
     {
         if (faction1 == faction2) return false;
@@ -503,13 +570,23 @@ public class FactionManager : MonoBehaviour
 
     public IReadOnlyList<Ship> GetFactionShips(FactionType faction)
     {
-        var factionData = GetFactionData(faction);
-        return factionData?.Ships ?? new List<Ship>().AsReadOnly();
+         var factionData = GetFactionData(faction);
+         if (factionData == null)
+         {
+            Debug.LogError($"No faction data for {faction}");
+             return new List<Ship>().AsReadOnly();
+         }
+         return factionData?.Ships ?? new List<Ship>().AsReadOnly();
     }
 
     public IReadOnlyList<Port> GetFactionPorts(FactionType faction)
     {
-        var factionData = GetFactionData(faction);
+         var factionData = GetFactionData(faction);
+         if (factionData == null)
+        {
+              Debug.LogError($"No faction data for {faction}");
+            return new List<Port>().AsReadOnly();
+        }
         return factionData?.Ports ?? new List<Port>().AsReadOnly();
     }
 
@@ -529,18 +606,21 @@ public class FactionManager : MonoBehaviour
             {
                 // Create the faction data structure
                 var newFaction = new FactionDefinition(definition.type, definition.displayName);
-                factions[definition.type] = newFaction;
+                 factions[definition.type] = newFaction;
 
                 // Create containers
-                factionPirates[definition.type] = new List<Pirate>();
-                factionShips[definition.type] = new HashSet<Ship>();
+                 if (!factionPirates.ContainsKey(definition.type))
+                     factionPirates[definition.type] = new List<Pirate>();
+
+                 if (!factionShips.ContainsKey(definition.type))
+                    factionShips[definition.type] = new HashSet<Ship>();
 
                 // Create a default leader for the faction
                 CreateFactionLeader(definition.type);
             }
         }
 
-        Debug.Log("Factions initialized: " + string.Join(", ", factions.Keys));
+           Debug.Log("Factions initialized: " + string.Join(", ", factions.Keys));
     }
 
     private void CreateFactionLeader(FactionType factionType)
@@ -586,5 +666,10 @@ public class FactionManager : MonoBehaviour
 
             Instance = null;
         }
+    }
+
+        public bool IsFactionInitialized(FactionType factionType)
+    {
+        return factionData != null && factionData.ContainsKey(factionType);
     }
 }

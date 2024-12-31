@@ -1,86 +1,84 @@
 using UnityEngine;
-using System.IO;
 using System;
+using System.IO;
 
 public class ConsoleLogExporter : MonoBehaviour
 {
+    [SerializeField]
+    private string fileName = "game_log.txt";
     private string logFilePath;
-    private StreamWriter writer;
-    public bool exportOnStart = true;
-    public bool exportOnQuit = true;
-
-
-    void Start()
+    
+    private void Awake()
     {
-        // Determine the log file path (you can customize this)
-        string fileName = "unity_console_log_" + DateTime.Now.ToString("yyyy-MM-dd_HH-mm-ss") + ".txt";
+        // Use persistent data path instead of Assets folder
         logFilePath = Path.Combine(Application.persistentDataPath, fileName);
-
-        if (exportOnStart)
+        Debug.Log($"Log file will be saved to: {logFilePath}");
+        
+        // Create directory if it doesn't exist
+        string directory = Path.GetDirectoryName(logFilePath);
+        if (!Directory.Exists(directory))
         {
-             StartExport();
+            Directory.CreateDirectory(directory);
         }
-    }
 
-    void OnEnable()
-    {
-        // Hook into the log callback
-        Application.logMessageReceived += LogCallback;
-    }
-    void OnDisable()
-    {
-       // Unhook into the log callback
-        Application.logMessageReceived -= LogCallback;
-    }
-    void OnApplicationQuit()
-    {
-        if (exportOnQuit)
-        {
-            StopExport();
-        }
-    }
-
-    void StartExport()
-    {
+        // Clear the file at start
         try
         {
-            // Create the file or overwrite it
-            writer = new StreamWriter(logFilePath, false); // "false" means overwrite
-            Debug.Log($"Log export started. File: {logFilePath}");
+            File.WriteAllText(logFilePath, $"=== New Session Started: {DateTime.Now} ===\n");
         }
-        catch (Exception ex)
+        catch (Exception e)
         {
-           Debug.LogError($"Error creating log file: {ex.Message}");
+            Debug.LogError($"Failed to initialize log file: {e.Message}");
         }
     }
 
-    void StopExport()
+    private void OnEnable()
     {
-        if (writer != null)
+        Application.logMessageReceived += HandleLog;
+        Debug.Log("ConsoleLogExporter enabled and listening for logs");
+    }
+
+    private void OnDisable()
+    {
+        Application.logMessageReceived -= HandleLog;
+    }
+
+    void HandleLog(string logString, string stackTrace, LogType type)
+    {
+        // Skip logging our own initialization message to avoid recursion
+        if (logString.Contains("ConsoleLogExporter enabled"))
+            return;
+
+        try
         {
-            writer.Close(); // important
-            writer = null;
-            Debug.Log($"Log export stopped. File: {logFilePath}");
+            string formattedMessage = FormatLogMessage(logString, stackTrace, type);
+            File.AppendAllText(logFilePath, formattedMessage);
+        }
+        catch (Exception e)
+        {
+            // Use Unity's internal debug to avoid infinite recursion
+            Debug.unityLogger.LogError("ConsoleLogExporter", $"Failed to write to log file: {e.Message}");
         }
     }
 
-    private void LogCallback(string logString, string stackTrace, LogType type)
+    private string FormatLogMessage(string logString, string stackTrace, LogType type)
     {
-        if(writer != null)
+        string timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
+        string logLevel = type.ToString().ToUpper();
+        string message = $"[{timestamp}] {logLevel}: {logString}\n";
+        
+        // Add stack trace for errors and exceptions
+        if (type == LogType.Error || type == LogType.Exception)
         {
-             // Determine a prefix for the message
-            string typeString = type.ToString().ToUpper();
-            string outputString = $"[{typeString}] {DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")} - {logString}";
-
-            // Add stack trace only for error logs
-            if (type == LogType.Error || type == LogType.Exception)
-            {
-                outputString += $"\nStackTrace: {stackTrace}";
-            }
-
-            // Write to file
-            writer.WriteLine(outputString);
-            writer.Flush();
+            message += $"Stack Trace:\n{stackTrace}\n";
         }
+        
+        return message;
+    }
+
+    // Optional: Method to get the log file location
+    public string GetLogFilePath()
+    {
+        return logFilePath;
     }
 }

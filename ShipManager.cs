@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using CSM.Base; // Added namespace
 using static ShipExtensions;
+using System.Collections;
 
 [AddComponentMenu("Game/Ship Manager")]
 public class ShipManager : MonoBehaviour
@@ -33,11 +34,12 @@ public class ShipManager : MonoBehaviour
     #region Unity Methods
     void Awake()
     {
-        if (Instance == null)
+         if (Instance == null)
         {
             Instance = this;
             DontDestroyOnLoad(gameObject);
-            InitializeManager();
+            // Initialize manager only after ensuring factions are ready
+            StartCoroutine(InitializeManagerWhenFactionsReady());
         }
         else
         {
@@ -46,8 +48,37 @@ public class ShipManager : MonoBehaviour
     }
     #endregion
 
+     private IEnumerator InitializeManagerWhenFactionsReady()
+    {
+        // Wait one frame to ensure FactionManager's Awake has completed
+        yield return null;
+
+        // Verify all required factions are initialized before proceeding
+        if (!VerifyFactionsInitialized())
+        {
+            Debug.LogError("[ShipManager] Cannot initialize - some factions are not ready!");
+            yield break;
+        }
+
+        InitializeManager();
+    }
+
+    private bool VerifyFactionsInitialized()
+    {
+        // Check each faction type that we need
+        foreach (FactionType factionType in Enum.GetValues(typeof(FactionType)))
+        {
+            if (!factionManager.IsFactionInitialized(factionType))
+            {
+                Debug.LogError($"[ShipManager] Faction not initialized: {factionType}");
+                return false;
+            }
+        }
+        return true;
+    }
+
     #region Initialization
-    private void InitializeManager()
+      private void InitializeManager()
     {
         Debug.Log("[ShipManager] Initializing manager");
         CreateContainers();
@@ -78,7 +109,6 @@ public class ShipManager : MonoBehaviour
             enabled = false;
         }
     }
-
 
     private void CreateContainers()
     {
@@ -361,7 +391,7 @@ public class ShipManager : MonoBehaviour
                 if (ship != null)
                 {
                     UnregisterShip(ship);
-                }
+                }                
             }
 
             playerInstance = null;
