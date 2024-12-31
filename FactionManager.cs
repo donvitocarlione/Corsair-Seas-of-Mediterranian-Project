@@ -11,15 +11,15 @@ public class FactionManager : MonoBehaviour
 
     [SerializeField] protected FactionConfiguration _configuration;
     public FactionConfiguration configuration => _configuration;
-    
+
     [SerializeField] protected List<FactionDefinitionAsset> factionDefinitions;
-    
+
     public FactionEventSystem EventSystem { get; protected set; }
-    
+
     protected Dictionary<FactionType, FactionDefinition> factions = new();
     private Dictionary<FactionType, HashSet<Faction>> factionEntities = new();
-    private Dictionary<FactionType, HashSet<Ship>> factionShips = new(); 
-    
+    private Dictionary<FactionType, HashSet<Ship>> factionShips = new();
+
     // Add new fields for pirate management
     private Dictionary<FactionType, List<Pirate>> factionPirates = new();
     private Dictionary<FactionType, Pirate> factionLeaders = new();
@@ -29,7 +29,7 @@ public class FactionManager : MonoBehaviour
         ValidateSingleton();
         EventSystem = new FactionEventSystem();
         InitializeFactions();
-        
+
         // Add debug logging to verify initialization
         Debug.Log($"Initialized factions: {string.Join(", ", factions.Keys)}");
     }
@@ -45,67 +45,546 @@ public class FactionManager : MonoBehaviour
         Instance = this;
     }
 
-    protected void InitializeFactions()
+    public void RegisterFactionEntity(Ship ship)
     {
-        Debug.Log("Starting faction initialization...");
-        
-        // First validate configuration
-        if (_configuration == null)
+        if (ship == null)
+            throw new ArgumentNullException(nameof(ship));
+
+        FactionType type = ship.Faction;
+        if (!factionEntities.ContainsKey(type))
         {
-            Debug.LogError("Faction configuration is missing!");
-            return;
+            factionEntities[type] = new HashSet<Faction>();
         }
 
-        // Initialize from faction definition assets if available
-        if (factionDefinitions != null && factionDefinitions.Count > 0)
+        // Handle ship registration separately since it's not a Faction
+        EventSystem.Publish(type, ship, FactionChangeType.EntityRegistered);
+        Debug.Log($"Registered ship entity: {ship.ShipName()} with {type}");
+    }
+
+    public void UnregisterFactionEntity(Faction entity)
+    {
+        if (entity == null)
+            throw new ArgumentNullException(nameof(entity));
+
+        if (factionEntities.ContainsKey(entity.Type))
         {
-            foreach (var definition in factionDefinitions)
+            factionEntities[entity.Type].Remove(entity);
+            EventSystem.Publish(entity.Type, entity, FactionChangeType.EntityUnregistered);
+            Debug.Log($"Unregistered faction entity: {entity.name} from {entity.Type}");
+        }
+    }
+
+    public IReadOnlyCollection<Faction> GetFactionEntities(FactionType type)
+    {
+        if (factionEntities.TryGetValue(type, out var entities))
+        {
+            return entities;
+        }
+        return new HashSet<Faction>();
+    }
+
+    protected void InitializeFaction(FactionDefinitionAsset asset)
+    {
+        if (asset == null) return;
+
+        // Create the basic faction data
+        var newFaction = new FactionDefinition(asset.type, asset.displayName);
+        factions[asset.type] = newFaction;
+
+        // Initialize containers for ships and pirates
+        if (!factionPirates.ContainsKey(asset.type))
+            factionPirates[asset.type] = new List<Pirate>();
+
+        if (!factionShips.ContainsKey(asset.type))
+            factionShips[asset.type] = new HashSet<Ship>();
+    }
+    // Add new methods for pirate management
+    public void SetFactionLeader(FactionType faction, Pirate pirate)
+    {
+        if (faction == FactionType.None || faction == FactionType.Independent)
+            return;
+
+        if (factionLeaders.TryGetValue(faction, out Pirate currentLeader))
+        {
+            currentLeader.SetRank(PirateRank.Captain);
+        }
+
+        factionLeaders[faction] = pirate;
+        pirate.SetRank(PirateRank.FactionLeader);
+        Debug.Log($"Set pirate {pirate.name} as the faction leader of {faction}");
+    }
+
+    // Modify your existing RegisterPirate method
+    public void RegisterPirate(FactionType faction, Pirate pirate)
+    {
+        if (pirate == null)
+            throw new ArgumentNullException(nameof(pirate));
+
+        if (!factions.ContainsKey(faction))
+        {
+            Debug.LogWarning($"Faction {faction} not initialized. Initializing with default values...");
+            InitializeDefaultFaction(faction);
+
+            // Verify initialization was successful
+            if (!factions.ContainsKey(faction))
             {
-                if (definition != null)
+                Debug.LogError($"Failed to initialize faction {faction}");
+                return;
+            }
+        }
+
+
+        if (!factionPirates.ContainsKey(faction))
+            factionPirates[faction] = new List<Pirate>();
+
+        if (!factionPirates[faction].Contains(pirate))
+        {
+            factionPirates[faction].Add(pirate);
+            foreach (var ship in pirate.GetOwnedShips())
+            {
+                RegisterShip(faction, ship);
+            }
+            EventSystem.Publish(faction, pirate, FactionChangeType.PirateRegistered);
+            Debug.Log($"Registered pirate {pirate.name} to faction {faction}");
+        }
+        else
+        {
+            Debug.LogWarning($"Attempting to register an already registered pirate {pirate.name} to faction {faction}");
+        }
+    }
+
+
+    public void UnregisterPirate(FactionType faction, Pirate pirate)
+    {
+        if (pirate == null)
+        {
+            throw new ArgumentNullException(nameof(pirate));
+        }
+
+        if (factionPirates.TryGetValue(faction, out List<Pirate> pirates))
+        {
+            if (pirates.Remove(pirate))
+            {
+                // Unregister all ships owned by the pirate
+                foreach (var ship in pirate.GetOwnedShips())
                 {
-                    InitializeFactionFromAsset(definition);
-                    InitializeFactionContainers(definition.type);
-                    Debug.Log($"Initialized faction from asset: {definition.displayName} ({definition.type})");
+                    UnregisterShip(faction, ship);
                 }
-                else
-                {
-                    Debug.LogWarning("Null faction definition found in factionDefinitions list");
-                }
+                EventSystem.Publish(faction, pirate, FactionChangeType.PirateUnregistered);
+                Debug.Log($"Unregistered pirate {pirate.name} from faction {faction}");
+            }
+            else
+            {
+                Debug.LogWarning($"Attempting to unregister a pirate {pirate.name} that does not exist on faction {faction}");
             }
         }
         else
         {
-            Debug.LogWarning("No faction definitions found, initializing default factions...");
+            Debug.LogWarning($"Attempting to unregister pirate from unknown faction: {faction}");
+        }
+    }
+
+
+    protected void InitializeDefaultFaction(FactionType faction)
+    {
+        if (!factions.ContainsKey(faction))
+        {
+            var newFaction = new FactionDefinition(
+                faction,
+                faction.ToString()
+            )
+            {
+                Influence = (int)configuration.defaultInfluence,
+                ResourceLevel = (int)configuration.defaultResourceLevel,
+                Color = GetDefaultFactionColor(faction),
+                BaseLocation = "Unknown"
+            };
+
+            factions[faction] = newFaction;
+            InitializeFactionRelations(newFaction);
+            Debug.Log($"Initialized default faction: {faction}");
+        }
+    }
+
+
+    protected void InitializeFactionFromAsset(FactionDefinitionAsset asset)
+    {
+        if (factions.ContainsKey(asset.type))
+        {
+            Debug.LogWarning($"Faction {asset.type} already exists! Skipping initialization.");
+            return;
         }
 
-        // Initialize any missing faction types with default values
-        foreach (FactionType factionType in Enum.GetValues(typeof(FactionType)))
+        var newFaction = new FactionDefinition(
+            asset.type,
+            asset.displayName
+        )
         {
-            if (!factions.ContainsKey(factionType))
+            Influence = asset.initialInfluence,
+            ResourceLevel = asset.initialResourceLevel,
+            Color = asset.color,
+            BaseLocation = asset.baseLocation
+        };
+
+        factions[asset.type] = newFaction;
+        InitializeFactionRelations(newFaction);
+        Debug.Log($"Initialized faction from asset: {asset.displayName} ({asset.type})");
+    }
+
+    protected Color GetDefaultFactionColor(FactionType faction)
+    {
+        return faction switch
+        {
+            FactionType.CaribbeanPirates => Color.red,      // Bright red for Caribbean Pirates
+            FactionType.BarbaryCorsairs => Color.yellow,    // Yellow for Barbary Corsairs
+            FactionType.MediterraneanPirates => Color.blue, // Blue for Mediterranean Pirates
+            FactionType.BlackFlagAlliance => Color.black,   // Black for Black Flag Alliance
+            FactionType.Independent => Color.gray,          // Gray for Independent pirates
+            _ => Color.white                                // White as fallback for None or undefined
+        };
+    }
+
+    protected void InitializeFactionRelations(FactionDefinition faction)
+    {
+        foreach (FactionType otherFaction in Enum.GetValues(typeof(FactionType)))
+        {
+            if (faction.Type != otherFaction)
             {
-                InitializeDefaultFaction(factionType);
-                InitializeFactionContainers(factionType);
-                Debug.Log($"Initialized default faction: {factionType}");
+                faction.SetRelation(otherFaction, configuration.neutralRelation);
+            }
+        }
+    }
+
+    public void RegisterShip(FactionType faction, Ship ship)
+    {
+        if (ship == null)
+            throw new ArgumentNullException(nameof(ship));
+
+        // Check if faction exists and initialize if needed
+        if (!factions.ContainsKey(faction))
+        {
+            Debug.LogWarning($"Faction {faction} not initialized. Initializing with default values...");
+            InitializeDefaultFaction(faction);
+
+            // Verify initialization was successful
+            if (!factions.ContainsKey(faction))
+            {
+                Debug.LogError($"Failed to initialize faction {faction}");
+                return;
             }
         }
 
-        Debug.Log($"Faction initialization complete. Total factions: {factions.Count}");
+        // Verify the faction is properly initialized
+        var factionData = factions[faction];
+        if (factionData == null)
+        {
+            Debug.LogError($"Faction {faction} exists but has null data");
+            return;
+        }
+
+        if (ship.Faction != faction)
+        {
+            Debug.LogError($"Ship {ship.ShipName()} faction mismatch during registration. Expected {faction}, but ship has {ship.Faction}");
+            return;
+        }
+
+        factionData.AddShip(ship);
+        RegisterFactionEntity(ship);
+        EventSystem.Publish(faction, ship, FactionChangeType.ShipRegistered);
+        Debug.Log($"Ship {ship.ShipName()} registered with faction {faction}");
     }
 
-    private void InitializeFactionContainers(FactionType factionType)
+
+    public void UnregisterShip(FactionType faction, Ship ship)
     {
-        // Initialize containers for the faction if they don't exist
-        if (!factionEntities.ContainsKey(factionType))
-            factionEntities[factionType] = new HashSet<Faction>();
-            
-        if (!factionShips.ContainsKey(factionType))
-            factionShips[factionType] = new HashSet<Ship>();
-            
-        if (!factionPirates.ContainsKey(factionType))
-            factionPirates[factionType] = new List<Pirate>();
+        if (ship == null)
+        {
+            throw new ArgumentNullException(nameof(ship));
+        }
+
+        if (factions.TryGetValue(faction, out FactionDefinition factionData))
+        {
+            factionData.RemoveShip(ship);
+            UnregisterShipEntity(ship);  // Use the new method here
+            EventSystem.Publish(faction, ship, FactionChangeType.ShipUnregistered);
+            Debug.Log($"Unregistered ship {ship.ShipName()} from faction {faction}");
+        }
+        else
+        {
+            Debug.LogWarning($"Attempting to unregister ship from unknown faction: {faction}");
+        }
     }
 
-    // Rest of your existing FactionManager code...
 
-    // Your existing methods continue here...
+    public void UnregisterShipEntity(Ship ship)
+    {
+        if (ship == null)
+            throw new ArgumentNullException(nameof(ship));
+
+        FactionType type = ship.Faction;
+        if (factionEntities.ContainsKey(type))
+        {
+            EventSystem.Publish(type, ship,
+            FactionChangeType.EntityUnregistered);
+            Debug.Log($"Unregistered ship entity: {ship.ShipName()} from {type}");
+        }
+    }
+
+
+
+    public void UpdateFactionRelation(FactionType faction1, FactionType faction2, float newValue)
+    {
+        if (faction1 == faction2)
+        {
+            throw new ArgumentException("Cannot update relation between a faction and itself!");
+        }
+
+        var faction1Data = GetFactionData(faction1);
+        var faction2Data = GetFactionData(faction2);
+
+        if (faction1Data != null && faction2Data != null)
+        {
+            float clampedValue = Mathf.Clamp(newValue, configuration.minRelation, configuration.maxRelation);
+
+            faction1Data.SetRelation(faction2, clampedValue);
+            faction2Data.SetRelation(faction1, clampedValue);
+
+            EventSystem.Publish(faction1, clampedValue, FactionChangeType.RelationChanged);
+
+            // Log significant relation changes
+            if (clampedValue <= configuration.warThreshold)
+            {
+                Debug.Log($"War conditions between {faction1} and {faction2} (Relation: {clampedValue})");
+            }
+            else if (clampedValue >= configuration.allyThreshold)
+            {
+                Debug.Log($"Alliance formed between {faction1} and {faction2} (Relation: {clampedValue})");
+            }
+        }
+    }
+
+    public void ModifyFactionInfluence(FactionType faction, int change)
+    {
+        if (change == 0) return;
+
+        if (factions.TryGetValue(faction, out FactionDefinition factionData))
+        {
+            int oldInfluence = factionData.Influence;
+            factionData.Influence = Mathf.Clamp(factionData.Influence + change, 0, 100);
+
+            if (oldInfluence != factionData.Influence)
+            {
+                EventSystem.Publish(faction, factionData.Influence, FactionChangeType.InfluenceChanged);
+                Debug.Log($"Updated {faction} influence from {oldInfluence} to {factionData.Influence}");
+            }
+        }
+        else
+        {
+            Debug.LogWarning($"Attempting to modify influence of unknown faction: {faction}");
+        }
+    }
+
+    public void HandlePortCapture(FactionType capturingFaction, Port capturedPort)
+    {
+        if (capturedPort == null)
+        {
+            throw new ArgumentNullException(nameof(capturedPort));
+        }
+
+        var oldFaction = capturedPort.OwningFaction;
+        var oldFactionData = GetFactionData(oldFaction);
+        var newFactionData = GetFactionData(capturingFaction);
+
+        if (oldFactionData != null)
+        {
+            oldFactionData.RemovePort(capturedPort);
+        }
+
+        if (newFactionData != null)
+        {
+            newFactionData.AddPort(capturedPort);
+            capturedPort.SetFaction(capturingFaction);
+            EventSystem.Publish(capturingFaction, capturedPort, FactionChangeType.PortCaptured);
+
+            // Update relations and influence
+            if (oldFaction != FactionType.None)
+            {
+                float currentRelation = GetRelationBetweenFactions(oldFaction, capturingFaction);
+                UpdateFactionRelation(oldFaction, capturingFaction, currentRelation - configuration.captureRelationPenalty);
+                ModifyFactionInfluence(oldFaction, -configuration.captureInfluenceChange);
+                ModifyFactionInfluence(capturingFaction, configuration.captureInfluenceChange);
+            }
+        }
+    }
+
+    public void RecordTradeBetweenFactions(FactionType faction1, FactionType faction2, float value)
+    {
+        if (faction1 == faction2 || value <= 0)
+        {
+            return;
+        }
+
+        var faction1Data = GetFactionData(faction1);
+        var faction2Data = GetFactionData(faction2);
+
+        if (faction1Data != null && faction2Data != null)
+        {
+            float relationBonus = value * configuration.tradeRelationMultiplier;
+            float currentRelation = faction1Data.GetRelation(faction2);
+            float newRelation = Mathf.Min(currentRelation + relationBonus, configuration.maxRelation);
+
+            UpdateFactionRelation(faction1, faction2, newRelation);
+            Debug.Log($"Trade between {faction1} and {faction2} improved relations by {relationBonus:F1} points");
+        }
+    }
+
+    public Pirate GetFactionOwner(FactionType factionType)
+    {
+        // First try to get the faction leader
+        if (factionLeaders.TryGetValue(factionType, out Pirate leader))
+        {
+            return leader;
+        }
+
+        // If no leader exists, try to get the first pirate of that faction
+        if (factionPirates.TryGetValue(factionType, out var pirates) && pirates.Count > 0)
+        {
+            return pirates[0];
+        }
+
+        Debug.LogWarning($"No Pirate owner found for faction {factionType}. Creating a new one...");
+
+        // Create a new pirate for the faction if none exists
+        GameObject pirateObject = new GameObject($"{factionType}_Leader");
+        pirateObject.transform.parent = transform; // Parent the leader
+        Pirate newPirate = pirateObject.AddComponent<Pirate>();
+        newPirate.SetFaction(factionType);
+        SetFactionLeader(factionType, newPirate);
+        factionPirates[factionType].Add(newPirate); // ensure new pirate is added to pirates
+        return newPirate;
+    }
+
+    public FactionDefinition GetFactionData(FactionType faction)
+    {
+        if (factions.TryGetValue(faction, out FactionDefinition factionData))
+        {
+            return factionData;
+        }
+        throw new ArgumentException($"Unknown faction: {faction}", nameof(faction));
+    }
+
+    public bool AreFactionsAtWar(FactionType faction1, FactionType faction2)
+    {
+        if (faction1 == faction2) return false;
+
+        var faction1Data = GetFactionData(faction1);
+        if (faction1Data == null) return false;
+
+        return faction1Data.GetRelation(faction2) < configuration.warThreshold;
+    }
+
+    public bool AreFactionsAllied(FactionType faction1, FactionType faction2)
+    {
+        if (faction1 == faction2) return true;
+
+        var faction1Data = GetFactionData(faction1);
+        if (faction1Data == null) return false;
+
+        return faction1Data.GetRelation(faction2) >= configuration.allyThreshold;
+    }
+
+    public float GetRelationBetweenFactions(FactionType faction1, FactionType faction2)
+    {
+        if (faction1 == faction2) return configuration.maxRelation;
+
+        var faction1Data = GetFactionData(faction1);
+        return faction1Data?.GetRelation(faction2) ?? configuration.neutralRelation;
+    }
+
+    public IReadOnlyList<Ship> GetFactionShips(FactionType faction)
+    {
+        var factionData = GetFactionData(faction);
+        return factionData?.Ships ?? new List<Ship>().AsReadOnly();
+    }
+
+    public IReadOnlyList<Port> GetFactionPorts(FactionType faction)
+    {
+        var factionData = GetFactionData(faction);
+        return factionData?.Ports ?? new List<Port>().AsReadOnly();
+    }
+
+    public Color GetFactionColor(FactionType faction)
+    {
+        var factionData = GetFactionData(faction);
+        return factionData?.Color ?? Color.gray;
+    }
+
+
+    protected void InitializeFactions()
+    {
+        // First, initialize basic faction data
+        foreach (var definition in factionDefinitions)
+        {
+            if (definition != null)
+            {
+                // Create the faction data structure
+                var newFaction = new FactionDefinition(definition.type, definition.displayName);
+                factions[definition.type] = newFaction;
+
+                // Create containers
+                factionPirates[definition.type] = new List<Pirate>();
+                factionShips[definition.type] = new HashSet<Ship>();
+
+                // Create a default leader for the faction
+                CreateFactionLeader(definition.type);
+            }
+        }
+
+        Debug.Log("Factions initialized: " + string.Join(", ", factions.Keys));
+    }
+
+    private void CreateFactionLeader(FactionType factionType)
+    {
+        // Create a new game object under the correct parent
+        var leaderObject = new GameObject($"{factionType}_Leader");
+        leaderObject.transform.parent = transform; // Or a dedicated parent
+
+        // Add and initialize the Pirate component
+        var leader = leaderObject.AddComponent<Pirate>();
+        leader.SetFaction(factionType);
+
+        // Register the leader
+        factionLeaders[factionType] = leader;
+        factionPirates[factionType].Add(leader);
+    }
+
+
+    protected void OnDestroy()
+    {
+        if (Instance == this)
+        {
+            foreach (var entitySet in factionEntities.Values)
+            {
+                entitySet.Clear();
+            }
+            factionEntities.Clear();
+
+            foreach (var shipSet in factionShips.Values)
+            {
+                shipSet.Clear();
+            }
+            factionShips.Clear();
+
+            // Clearing the pirate dictionaries
+            foreach (var pirateList in factionPirates.Values)
+            {
+                pirateList.Clear();
+            }
+            factionPirates.Clear();
+
+            factionLeaders.Clear();
+
+            Instance = null;
+        }
+    }
 }
