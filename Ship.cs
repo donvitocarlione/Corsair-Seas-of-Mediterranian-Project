@@ -33,12 +33,17 @@ public class Ship : SeaEntityBase, IOwnable
     public bool IsSinking => isSinking;
      // Implement IOwnable:
     public IEntityOwner Owner => _owner;
+    public FactionType Faction { get; private set; }
 
     public override string Name
     {
         get => EntityName;
         protected set => EntityName = value;
     }
+
+     private bool isInitialized = false;
+     private bool startCalled = false;
+
 
     protected override void Awake()
     {
@@ -69,9 +74,14 @@ public class Ship : SeaEntityBase, IOwnable
                   $"- SelectionHandler: {selectionHandler != null}");
     }
 
-    protected override void Start()
+      protected override void Start()
     {
-        Debug.Log($"[Ship] Start called on {gameObject.name}");
+        startCalled = true;
+        if (isInitialized)
+        {
+            OnInitializedStart();
+        }
+         Debug.Log($"[Ship] Start called on {gameObject.name}");
         base.Start();
     }
    
@@ -80,51 +90,88 @@ public class Ship : SeaEntityBase, IOwnable
         EntityName = newName;
         Debug.Log($"[Ship] Name set to {newName} for {gameObject.name}");
     }
-
-    // Use IEntityOwner instead of IShipOwner
-    public void Initialize(string shipName, FactionType faction, IEntityOwner shipOwner)
+     public override void Initialize(string shipName, FactionType faction, IEntityOwner shipOwner)
     {
-        if (FactionManager.Instance == null)
+        if (isInitialized)
         {
-            Debug.LogError($"[Ship] Cannot initialize - FactionManager not ready");
+             Debug.LogWarning($"[Ship] Ship {shipName} is already initialized");
             return;
         }
-
+        if (shipOwner == null)
+        {
+             Debug.LogError($"[Ship] Cannot initialize {shipName} - no owner provided");
+            return;
+        }
+        if (shipOwner.Faction != faction)
+        {
+            Debug.LogError($"[Ship] Owner faction {shipOwner.Faction} doesn't match ship faction {faction}");
+             return;
+        }
         SetName(shipName);
         SetFaction(faction);
-        FactionManager.Instance.RegisterShip(faction, this);
-
-        if (shipOwner != null)
+        if (!SetOwner(shipOwner))
         {
-           SetOwner(shipOwner);
+            Debug.LogError($"[Ship] Failed to set owner for {shipName}");
+            return;
+        }
+         if (FactionManager.Instance != null)
+        {
+            FactionManager.Instance.RegisterShip(faction, this);
         }
 
-        base.Initialize(shipName, faction, shipOwner);
-        Debug.Log($"[Ship] Initialization complete for {shipName} with faction {faction}");
+         isInitialized = true;
+       Debug.Log($"[Ship] {shipName} initialized successfully with faction {faction} and owner {shipOwner.GetType().Name}");
+          if (startCalled)
+        {
+            OnInitializedStart();
+        }
+
+    }
+      protected virtual void OnInitializedStart()
+    {
+        // Put your Start logic here
+           Debug.Log($"[Ship] Start called for {Name} after initialization");
+    }
+
+     public void SetFaction(FactionType faction)
+    {
+        Faction = faction;
     }
     
     // Implement IOwnable
-    public bool SetOwner(IEntityOwner newOwner)
+     public bool SetOwner(IEntityOwner newOwner)
     {
-         Debug.Log($"[Ship] Setting owner for {gameObject.name} to {(newOwner != null ? newOwner.GetType().Name : "null")}");
-        if (_owner != null && !ReferenceEquals(_owner, newOwner))
+         if (newOwner == _owner) return true; // Already set
+        
+        // Validate new owner's faction matches ship's faction
+        if (newOwner != null && newOwner.Faction != Faction)
         {
-             if (_owner is IShipOwner oldShipOwner)
+           Debug.LogError($"[Ship] Cannot set owner - faction mismatch. Ship:{Faction}, Owner:{newOwner.Faction}");
+           return false;
+        }
+
+        // Handle old owner cleanup
+        if (_owner != null)
+        {
+            if (_owner is IShipOwner oldShipOwner)
             {
                 oldShipOwner.RemoveShip(this);
             }
         }
-          _owner = newOwner;
 
+        _owner = newOwner;
+
+        // Handle new owner setup
         if (_owner is IShipOwner shipOwner)
         {
-             shipOwner.AddShip(this);
+            shipOwner.AddShip(this);
         }
-            
-            OnOwnerChanged?.Invoke(_owner);
 
-        return true;
+         Debug.Log($"[Ship] {Name} owner changed to {(_owner != null ? _owner.GetType().Name : "none")}");
+        OnOwnerChanged?.Invoke(_owner);
+         return true;
     }
+
 
     public event System.Action<IEntityOwner> OnOwnerChanged;
 

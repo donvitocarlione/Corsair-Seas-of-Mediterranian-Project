@@ -13,7 +13,8 @@ public class ShipSelectionHandler : MonoBehaviour
     private Material selectedMaterial;
     
     private Material[] originalMaterials;
-    private Ship shipReference;
+    private Ship ship;
+    private Player localPlayer;
     
     private void OnEnable()
     {
@@ -26,9 +27,9 @@ public class ShipSelectionHandler : MonoBehaviour
     
     private void Awake()
     {
-        shipReference = GetComponent<Ship>();
+         ship = GetComponent<Ship>();
         
-        if (shipReference == null)
+        if (ship == null)
         {
             Debug.LogError($"[ShipSelectionHandler] No Ship component found on {gameObject.name}");
             return;
@@ -47,6 +48,10 @@ public class ShipSelectionHandler : MonoBehaviour
         {
             SetLayerRecursively(gameObject, LayerMask.NameToLayer("Ship"));
         }
+    }
+    private void Start()
+    {
+        localPlayer = FindObjectOfType<Player>();
     }
 
     private void StoreOriginalMaterials()
@@ -117,30 +122,22 @@ public class ShipSelectionHandler : MonoBehaviour
         }
     }
 
-    private void OnMouseDown()
-    {
+   private void OnMouseDown()
+   {
+       if (ship == null || localPlayer == null) return;
 
-        Debug.Log($"[ShipSelectionHandler] OnMouseDown called for {gameObject.name}");
-
-        if (Camera.main == null) return;
-            
-        Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
-        if (Physics.Raycast(ray, out RaycastHit hit, Mathf.Infinity, selectableLayerMask))
+       // Check if ship is owned by player
+       if (ship.Owner == localPlayer)
+       {
+           ship.Select();
+       }
+        else
         {
-            if (hit.collider.gameObject != gameObject) return;
-
-            // Find the player in the scene
-            var player = GameObject.FindObjectOfType<Player>();
-            if (player != null)
-            {
-                player.SelectShip(shipReference);
-            }
-            else
-            {
-                Debug.LogError("[ShipSelectionHandler] No Player found in scene!");
-            }
+            Debug.LogWarning($"Cannot select ship '{ship.Name}' - not owned by player");
+            return;
         }
-    }
+   }
+
 
     private void OnDestroy()
     {

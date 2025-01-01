@@ -32,6 +32,8 @@ public class ShipManager : MonoBehaviour
 
     private Player playerInstance;
     private Dictionary<Ship, FactionType> registeredShips = new Dictionary<Ship, FactionType>();
+     private Dictionary<FactionType, IEntityOwner> factionOwners = new Dictionary<FactionType, IEntityOwner>();
+    private Queue<(FactionType faction, int count)> pendingShipSpawns = new Queue<(FactionType, int)>();
 
 
     #region Unity Methods
@@ -62,9 +64,41 @@ public class ShipManager : MonoBehaviour
             Debug.LogError("[ShipManager] Cannot initialize - some factions are not ready!");
             yield break;
         }
+        // Queue ship spawns instead of spawning immediately
+        foreach (var factionData in factionShipData)
+        {
+            pendingShipSpawns.Enqueue((factionData.faction, factionData.initialShipCount));
+        }
 
-        InitializeManager();
+         StartCoroutine(ProcessPendingShipSpawns());
+
     }
+    private IEnumerator ProcessPendingShipSpawns()
+    {
+        while (pendingShipSpawns.Count > 0)
+        {
+            var (faction, count) = pendingShipSpawns.Peek();
+
+            // Wait for faction owner to be available
+            var owner = faction == playerFaction ? playerInstance : factionManager.GetFactionOwner(faction);
+            if (owner == null)
+            {
+                Debug.Log($"[ShipManager] Waiting for owner for faction {faction}");
+                yield return new WaitForSeconds(0.1f);
+                continue;
+            }
+            pendingShipSpawns.Dequeue();
+            factionOwners[faction] = owner;
+
+            for (int i = 0; i < count; i++)
+            {
+                SpawnShipForFaction(faction);
+                yield return null; // Spread spawning across frames
+            }
+        }
+           Debug.Log("[ShipManager] All ships spawned successfully");
+    }
+
 
     private bool VerifyFactionsInitialized()
     {
@@ -104,7 +138,7 @@ public class ShipManager : MonoBehaviour
 
         if (isInitialized)
         {
-            InitializeAllFactions();
+            //InitializeAllFactions(); //Move this into the ProcessPendingShipSpawns coroutine
         }
         else
         {
@@ -184,68 +218,28 @@ public class ShipManager : MonoBehaviour
 
     #region Ship Spawning
     //Modified to use Faction Owner instead of just Faction type.
-     public Ship SpawnShipForFaction(FactionType faction, Vector3? customPosition = null)
+      public Ship SpawnShipForFaction(FactionType faction, Vector3? customPosition = null)
     {
-        if (!isInitialized)
+        if (!isInitialized || !factionOwners.ContainsKey(faction))
         {
-            Debug.LogError($"[ShipManager] Cannot spawn ship. Manager is not initialized.");
-            return null;
+             pendingShipSpawns.Enqueue((faction,1));
+             return null;
         }
-
-        var factionData = GetFactionShipData(faction);
-        if (factionData == null)
-        {
-            Debug.LogError($"[ShipManager] No faction data for {faction}. Cannot spawn ship.");
-            return null;
-        }
-
-        GameObject prefab = factionData.shipPrefabs[Random.Range(0, factionData.shipPrefabs.Count)];
-
-        Vector3 spawnPosition;
-        if (customPosition.HasValue)
-        {
-            spawnPosition = customPosition.Value;
-        }
-        else
-        {
-            spawnPosition = GetSafeSpawnPosition(factionData.spawnArea, factionData.spawnRadius);
-            if (spawnPosition == Vector3.zero)
-            {
-                Debug.LogWarning($"[ShipManager] No available position found for {faction}. Cannot spawn ship.");
-                return null;
-            }
-        }
-
-        occupiedPositions.Add(spawnPosition);
-        GameObject shipInstance = Instantiate(prefab, spawnPosition, Quaternion.identity, shipsParent);
-
-         Ship ship = shipInstance.GetComponent<Ship>();
-        if (ship != null)
+       var owner = faction == playerFaction ? playerInstance : factionOwners[faction];
+        Debug.Log($"[ShipManager] Spawning ship for {faction} with owner {owner.GetType().Name}");
+         var factionData = GetFactionShipData(faction);
+          var prefab = factionData.shipPrefabs[Random.Range(0, factionData.shipPrefabs.Count)];
+          var position = customPosition ?? GetSafeSpawnPosition(factionData.spawnArea, factionData.spawnRadius);
+        
+        var shipInstance = Instantiate(prefab, position, Quaternion.identity, shipsParent);
+        var ship = shipInstance.GetComponent<Ship>();
+         if (ship != null)
         {
             string shipName = $"{faction}_Ship_{Random.Range(1000, 9999)}";
-             // Determine the appropriate owner
-            IEntityOwner owner;
-            if (faction == playerFaction && playerInstance != null)
-            {
-                owner = playerInstance;
-                Debug.Log($"[ShipManager] Spawning player-owned ship {shipName}");
-            }
-            else
-            {
-                owner = factionManager.GetFactionOwner(faction);
-                Debug.Log($"[ShipManager] Spawning pirate-owned ship {shipName}");
-            }
-
-            if (owner == null)
-            {
-                Debug.LogError($"[ShipManager] Could not determine owner for faction {faction}");
-                Destroy(shipInstance);
-                return null;
-            }
-
-            ship.Initialize(shipName, faction, owner);
+             ship.Initialize(shipName, faction, owner);
         }
-        return ship;
+
+         return ship;
     }
 
      public Ship SpawnPirateShip(FactionType faction, Vector3? customPosition = null)
@@ -413,22 +407,24 @@ public class ShipManager : MonoBehaviour
     public void RegisterShip(Ship ship)
     {
         if (ship == null)
-            throw new System.ArgumentNullException(nameof(ship));
+            throw new ArgumentNullException(nameof(ship));
+       if (ship.Owner == null)
+        {
+             Debug.LogError($"[ShipManager] Ship {ship.Name} has no owner during registration");
+            return;
+        }
+
+        if (ship.Owner.Faction != ship.Faction)
+        {
+            Debug.LogError($"[ShipManager] Ship {ship.Name} has mismatched owner/faction");
+           return;
+        }
 
         if (!registeredShips.ContainsKey(ship))
         {
-            FactionType shipFaction = ship.Faction;
-            registeredShips.Add(ship, shipFaction);
-
-            if (factionManager != null)
-            {
-                factionManager.RegisterShip(shipFaction, ship);
-                Debug.Log($"Ship {ship.ShipName()} registered with faction {shipFaction}");
-            }
-            else
-            {
-                Debug.LogWarning($"FactionManager not available - Ship {ship.ShipName()} registered only with ShipManager");
-            }
+            registeredShips.Add(ship, ship.Faction);
+            factionManager?.RegisterShip(ship.Faction, ship);
+            Debug.Log($"[ShipManager] Ship {ship.Name} registered with faction {ship.Faction}");
         }
     }
 
