@@ -31,9 +31,13 @@ public class Ship : SeaEntityBase, IOwnable
     public float Health => currentHealth;
     public bool IsSelected => isSelected;
     public bool IsSinking => isSinking;
-     // Implement IOwnable:
-    public IEntityOwner Owner => _owner;
-    public FactionType Faction { get; private set; }
+
+    // Use 'new' keyword to acknowledge hiding and to use own implementation:
+    public new IEntityOwner Owner => _owner;
+    public new FactionType Faction { get; private set; }
+
+     public new event System.Action<IEntityOwner> OnOwnerChanged;
+
 
     public override string Name
     {
@@ -133,9 +137,12 @@ public class Ship : SeaEntityBase, IOwnable
            Debug.Log($"[Ship] Start called for {Name} after initialization");
     }
 
-     public void SetFaction(FactionType faction)
+    //Use override instead of hiding
+      public override void SetFaction(FactionType faction)
     {
-        Faction = faction;
+        base.SetFaction(faction);
+         // Additional faction-specific logic here
+        Debug.Log($"[Ship] Faction set to {faction} for {gameObject.name}");
     }
     
     // Implement IOwnable
@@ -168,12 +175,10 @@ public class Ship : SeaEntityBase, IOwnable
         }
 
          Debug.Log($"[Ship] {Name} owner changed to {(_owner != null ? _owner.GetType().Name : "none")}");
+         // Use new event:
         OnOwnerChanged?.Invoke(_owner);
          return true;
     }
-
-
-    public event System.Action<IEntityOwner> OnOwnerChanged;
 
     public virtual void ClearOwner()
     {

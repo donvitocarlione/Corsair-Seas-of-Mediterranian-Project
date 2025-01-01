@@ -16,7 +16,8 @@ public class Player : Pirate, IEntityOwner
 
     public Ship SelectedShip => selectedShip;
     //Implement IEntityOwner
-    public string OwnerName => EntityName;
+    public new string OwnerName => EntityName;
+
 
 
     protected override void Start()

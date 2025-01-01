@@ -51,7 +51,8 @@ public class ShipSelectionHandler : MonoBehaviour
     }
     private void Start()
     {
-        localPlayer = FindObjectOfType<Player>();
+        // Replace FindObjectOfType with FindFirstObjectByType
+        localPlayer = UnityEngine.Object.FindFirstObjectByType<Player>();
     }
 
     private void StoreOriginalMaterials()
@@ -126,8 +127,8 @@ public class ShipSelectionHandler : MonoBehaviour
    {
        if (ship == null || localPlayer == null) return;
 
-       // Check if ship is owned by player
-       if (ship.Owner == localPlayer)
+       // Cast comparison to check IEntityOwner interface
+       if (ReferenceEquals(ship.Owner, localPlayer))
        {
            ship.Select();
        }

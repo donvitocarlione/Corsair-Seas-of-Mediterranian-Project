@@ -250,4 +250,12 @@ public class Pirate : SeaEntityBase, IEntityOwner, IShipOwner
             }
         }
     }
+        // Add method to handle faction leadership setup
+    public void SetupAsFactionLeader(FactionType faction)
+    {
+        SetFaction(faction);
+       SetRank(PirateRank.FactionLeader);
+        // Additional leader setup logic
+        Debug.Log($"Pirate {name} set up as faction leader for {faction}");
+    }
 }

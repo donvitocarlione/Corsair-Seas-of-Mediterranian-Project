@@ -12,6 +12,7 @@ public class FactionManager : MonoBehaviour
     private Dictionary<FactionType, List<Ship>> factionShips;
     private Dictionary<FactionType, List<Pirate>> factionPirates;
     private Dictionary<FactionType, IEntityOwner> factionLeaders = new Dictionary<FactionType, IEntityOwner>();
+    [SerializeField] private GameObject piratePrefab;
 
 
     public static FactionManager Instance { get; private set; }
@@ -126,13 +127,21 @@ public class FactionManager : MonoBehaviour
          if (factionLeaders.ContainsKey(faction))
             return factionLeaders[faction];
 
-        // Create pirate leader for faction
-        GameObject pirateObject = new GameObject($"{faction}_Leader");
-          pirateObject.transform.parent = transform;
-        Pirate newPirate = pirateObject.AddComponent<Pirate>();
-         newPirate.InitializeAsFactionLeader(faction);
+         if (piratePrefab == null)
+         {
+             Debug.LogError("[FactionManager] No pirate prefab assigned!");
+             return null;
+         }
 
-          return newPirate;
+        GameObject pirateObject = Instantiate(piratePrefab, Vector3.zero, Quaternion.identity);
+        Pirate newPirate = pirateObject.GetComponent<Pirate>();
+
+         // Initialize the pirate directly
+         newPirate.SetFaction(faction);
+         SetFactionLeader(faction, newPirate);
+
+         Debug.Log($"[FactionManager] Created new leader for {faction}");
+        return newPirate;
 
     }
 
@@ -180,10 +189,14 @@ public class FactionManager : MonoBehaviour
             return;
         }
 
-        if (factionLeaders.TryGetValue(faction, out Pirate currentLeader))
+        if (factionLeaders.TryGetValue(faction, out IEntityOwner currentLeader))
         {
-             Debug.Log($"[FactionManager] Previous leader found {currentLeader.name}, setting rank to Captain.");
-            currentLeader.SetRank(PirateRank.Captain);
+           if(currentLeader is Pirate oldPirate)
+             {
+                 Debug.Log($"[FactionManager] Previous leader found {oldPirate.name}, setting rank to Captain.");
+               oldPirate.SetRank(PirateRank.Captain);
+           }
+
         }
         Debug.Log($"[FactionManager] Setting {pirate.name} as leader of {faction}");
         factionLeaders[faction] = pirate;
