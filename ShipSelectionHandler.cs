@@ -14,11 +14,9 @@ public class ShipSelectionHandler : MonoBehaviour
     
     private Material[] originalMaterials;
     private Ship shipReference;
-    private ShipMovement movementComponent;
     
     private void OnEnable()
     {
-        Debug.Log($"[ShipSelectionHandler] OnEnable start for {gameObject.name}");
         // Initialize original materials if not already done
         if (originalMaterials == null || originalMaterials.Length != targetRenderers.Length)
         {
@@ -29,7 +27,6 @@ public class ShipSelectionHandler : MonoBehaviour
     private void Awake()
     {
         shipReference = GetComponent<Ship>();
-        movementComponent = GetComponent<ShipMovement>();
         
         if (shipReference == null)
         {
@@ -75,45 +72,16 @@ public class ShipSelectionHandler : MonoBehaviour
         }
     }
 
-    public bool Select()
+    public void Select()
     {
-        if (!CanBeSelected())
-        {
-            return false;
-        }
-
         ApplySelectedMaterial();
         ShowSelectionIndicator(true);
-        return true;
     }
 
     public void Deselect()
     {
         RestoreOriginalMaterials();
         ShowSelectionIndicator(false);
-    }
-
-    private bool CanBeSelected()
-    {
-        if (shipReference == null)
-        {
-            Debug.LogError($"[ShipSelectionHandler] Cannot select - shipReference is null on {gameObject.name}");
-            return false;
-        }
-
-        if (shipReference.ShipOwner == null)
-        {
-            Debug.LogError($"[ShipSelectionHandler] Cannot select - ship has no owner on {gameObject.name}");
-            return false;
-        }
-
-        if (!(shipReference.ShipOwner is Player))
-        {
-            Debug.LogWarning($"[ShipSelectionHandler] Cannot select - ship's owner is not a Player on {gameObject.name}");
-            return false;
-        }
-
-        return true;
     }
 
     private void ApplySelectedMaterial()
@@ -151,16 +119,25 @@ public class ShipSelectionHandler : MonoBehaviour
 
     private void OnMouseDown()
     {
+
+        Debug.Log($"[ShipSelectionHandler] OnMouseDown called for {gameObject.name}");
+
         if (Camera.main == null) return;
-        
+            
         Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
         if (Physics.Raycast(ray, out RaycastHit hit, Mathf.Infinity, selectableLayerMask))
         {
             if (hit.collider.gameObject != gameObject) return;
 
-            if (CanBeSelected() && shipReference.ShipOwner is Player player)
+            // Find the player in the scene
+            var player = GameObject.FindObjectOfType<Player>();
+            if (player != null)
             {
                 player.SelectShip(shipReference);
+            }
+            else
+            {
+                Debug.LogError("[ShipSelectionHandler] No Player found in scene!");
             }
         }
     }

@@ -12,6 +12,7 @@ namespace CSM.Base
         private float _currentHealth;
         private FactionType _faction;
         private bool _isInitialized;
+        private IEntityOwner _owner; // New field: Owner
 
         // Modified EntityName to be settable
         public virtual string EntityName
@@ -41,7 +42,21 @@ namespace CSM.Base
         public bool IsInitialized => _isInitialized;
 
         public virtual string Name { get; protected set; }
-
+        
+        // New Property: Owner
+        public IEntityOwner Owner
+        {
+            get => _owner;
+            protected set
+            {
+                if (_owner != value)
+                {
+                    var oldOwner = _owner;
+                    _owner = value;
+                    OnOwnerChanged(oldOwner, _owner);
+                }
+            }
+        }
 
         #endregion
 
@@ -65,6 +80,20 @@ namespace CSM.Base
         #endregion
 
         #region Public Methods
+
+          public virtual void Initialize(string name, FactionType faction, IEntityOwner owner)
+        {
+             if (_isInitialized)
+            {
+                Debug.LogWarning($"[{GetType().Name}] Attempting to initialize {entityName} multiple times");
+                return;
+            }
+                EntityName = name;
+                SetFaction(faction);
+                Owner = owner;
+                Initialize();  // Call the existing Initialize method
+            
+        }
 
         public virtual void TakeDamage(float damage, SeaEntityBase attacker)
         {
@@ -95,6 +124,17 @@ namespace CSM.Base
         public virtual void SetFaction(FactionType factionType)
         {
             Faction = factionType;
+        }
+        
+        //New validation methods
+        public bool IsOwnedBy(IEntityOwner controller)
+        {
+            return Owner == controller;
+        }
+
+        public bool BelongsToFaction(FactionType factionType)
+        {
+            return Faction == factionType;
         }
 
         #endregion
@@ -130,6 +170,12 @@ namespace CSM.Base
         #endregion
 
         #region Virtual Event Methods
+
+         protected virtual void OnOwnerChanged(IEntityOwner oldOwner, IEntityOwner newOwner)
+        {
+            Debug.Log($"[{GetType().Name}] {entityName} owner changed from {oldOwner?.OwnerName ?? "none"} to {newOwner?.OwnerName ?? "none"}");
+        }
+
 
         protected virtual void OnInitialized()
         {

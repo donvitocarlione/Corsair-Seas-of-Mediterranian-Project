@@ -8,7 +8,7 @@ using CSM.Base;
 [RequireComponent(typeof(ShipSelectionHandler))]
 [RequireComponent(typeof(Buoyancy))]
 [RequireComponent(typeof(ShipMovement))]
-public class Ship : SeaEntityBase
+public class Ship : SeaEntityBase, IOwnable
 {
     [Header("Ship Properties")]
     [SerializeField] protected float sinkingThreshold = 20f;
@@ -18,7 +18,9 @@ public class Ship : SeaEntityBase
     protected float currentHealth;
     protected bool isSelected;
     protected bool isSinking;
-    protected IShipOwner owner;
+    
+     // Use IEntityOwner instead of IShipOwner
+    private IEntityOwner _owner;
 
     protected Rigidbody shipRigidbody;
     protected Buoyancy buoyancyComponent;
@@ -29,7 +31,8 @@ public class Ship : SeaEntityBase
     public float Health => currentHealth;
     public bool IsSelected => isSelected;
     public bool IsSinking => isSinking;
-    public IShipOwner ShipOwner => owner;
+     // Implement IOwnable:
+    public IEntityOwner Owner => _owner;
 
     public override string Name
     {
@@ -78,7 +81,8 @@ public class Ship : SeaEntityBase
         Debug.Log($"[Ship] Name set to {newName} for {gameObject.name}");
     }
 
-    public void Initialize(FactionType faction, string shipName, IShipOwner shipOwner)
+    // Use IEntityOwner instead of IShipOwner
+    public void Initialize(string shipName, FactionType faction, IEntityOwner shipOwner)
     {
         if (FactionManager.Instance == null)
         {
@@ -92,27 +96,46 @@ public class Ship : SeaEntityBase
 
         if (shipOwner != null)
         {
-            SetOwner(shipOwner);
+           SetOwner(shipOwner);
         }
 
+        base.Initialize(shipName, faction, shipOwner);
         Debug.Log($"[Ship] Initialization complete for {shipName} with faction {faction}");
     }
-
-    public virtual void SetOwner(IShipOwner newOwner)
+    
+    // Implement IOwnable
+    public bool SetOwner(IEntityOwner newOwner)
     {
-        Debug.Log($"[Ship] Setting owner for {gameObject.name} to {(newOwner != null ? newOwner.GetType().Name : "null")}");
-        if (owner != null && !ReferenceEquals(owner, newOwner))
+         Debug.Log($"[Ship] Setting owner for {gameObject.name} to {(newOwner != null ? newOwner.GetType().Name : "null")}");
+        if (_owner != null && !ReferenceEquals(_owner, newOwner))
         {
-            owner.RemoveShip(this);
+             if (_owner is IShipOwner oldShipOwner)
+            {
+                oldShipOwner.RemoveShip(this);
+            }
         }
+          _owner = newOwner;
 
-        owner = newOwner;
+        if (_owner is IShipOwner shipOwner)
+        {
+             shipOwner.AddShip(this);
+        }
+            
+            OnOwnerChanged?.Invoke(_owner);
+
+        return true;
     }
+
+    public event System.Action<IEntityOwner> OnOwnerChanged;
 
     public virtual void ClearOwner()
     {
         Debug.Log($"[Ship] Clearing owner for {gameObject.name}");
-        owner = null;
+         if (_owner is IShipOwner shipOwner)
+        {
+           shipOwner.RemoveShip(this);
+        }
+        _owner = null;
     }
 
     public virtual void Select()

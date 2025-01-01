@@ -394,7 +394,7 @@ public class FactionManager : MonoBehaviour
         }
     }
 
-      public Pirate GetFactionOwner(FactionType factionType)
+     public IEntityOwner GetFactionOwner(FactionType factionType)
     {
         Debug.Log($"[FactionManager] GetFactionOwner called for {factionType}.");
         // First try to get the faction leader

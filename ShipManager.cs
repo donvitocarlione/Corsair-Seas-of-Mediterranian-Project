@@ -219,22 +219,31 @@ public class ShipManager : MonoBehaviour
         occupiedPositions.Add(spawnPosition);
         GameObject shipInstance = Instantiate(prefab, spawnPosition, Quaternion.identity, shipsParent);
 
-        Ship ship = shipInstance.GetComponent<Ship>();
+         Ship ship = shipInstance.GetComponent<Ship>();
         if (ship != null)
         {
             string shipName = $"{faction}_Ship_{Random.Range(1000, 9999)}";
-            
-            // Get Pirate owner for the faction
-            Pirate pirateOwner = factionManager.GetFactionOwner(faction);
-            if (pirateOwner == null)
+             // Determine the appropriate owner
+            IEntityOwner owner;
+            if (faction == playerFaction && playerInstance != null)
             {
-                Debug.LogError($"[ShipManager] Could not get or create Pirate owner for faction {faction}");
+                owner = playerInstance;
+                Debug.Log($"[ShipManager] Spawning player-owned ship {shipName}");
+            }
+            else
+            {
+                owner = factionManager.GetFactionOwner(faction);
+                Debug.Log($"[ShipManager] Spawning pirate-owned ship {shipName}");
+            }
+
+            if (owner == null)
+            {
+                Debug.LogError($"[ShipManager] Could not determine owner for faction {faction}");
                 Destroy(shipInstance);
                 return null;
             }
-             //Initialize ship with correct owner
-            ship.Initialize(faction, shipName, pirateOwner);
-           
+
+            ship.Initialize(shipName, faction, owner);
         }
         return ship;
     }
@@ -288,16 +297,15 @@ public class ShipManager : MonoBehaviour
         if (ship != null)
         {
              string shipName = $"{faction}_Pirate_{Random.Range(1000, 9999)}";
-             // Get Pirate owner for the faction
-             Pirate pirateOwner = factionManager.GetFactionOwner(faction);
-             if (pirateOwner == null)
-             {
+              IEntityOwner owner = factionManager.GetFactionOwner(faction);
+             if (owner == null)
+            {
                 Debug.LogError($"[ShipManager] Could not get or create Pirate owner for faction {faction}");
-                 Destroy(shipInstance);
-                  return null;
+                Destroy(shipInstance);
+                 return null;
              }
             
-            ship.Initialize(faction, shipName, pirateOwner);
+            ship.Initialize(shipName, faction, owner);
            
 
             Debug.Log($"[ShipManager] Pirate Ship {shipName} initialized and registered for faction {faction}");
@@ -426,7 +434,7 @@ public class ShipManager : MonoBehaviour
 
 
     public void UnregisterShip(Ship ship)
-    {
+    {    
         if (ship == null)
             throw new System.ArgumentNullException(nameof(ship));
 

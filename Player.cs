@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using static ShipExtensions;
 
 [AddComponentMenu("Game/Player")]
-public class Player : Pirate
+public class Player : Pirate, IEntityOwner
 {
     private Ship selectedShip;
     [SerializeField, Tooltip("Reference to the InputManager component")]
@@ -15,6 +15,9 @@ public class Player : Pirate
     public event System.Action<Ship> OnShipDeselected;
 
     public Ship SelectedShip => selectedShip;
+    //Implement IEntityOwner
+    public string OwnerName => EntityName;
+
 
     protected override void Start()
     {

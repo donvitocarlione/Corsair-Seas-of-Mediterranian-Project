@@ -4,7 +4,7 @@ using CSM.Base;
 using static ShipExtensions;
 
 [AddComponentMenu("Game/Pirate")]
-public class Pirate : SeaEntityBase, IShipOwner
+public class Pirate : SeaEntityBase, IEntityOwner, IShipOwner
 {
     [Header("Pirate Identity")]
     [SerializeField] private string pirateName;
@@ -26,6 +26,10 @@ public class Pirate : SeaEntityBase, IShipOwner
     private bool isFactionRegistered = false;
 
     public PirateRank Rank => rank;
+
+     //Implement IEntityOwner
+     public string OwnerName => EntityName;
+
 
     protected override void Awake()
     {
@@ -105,7 +109,7 @@ public class Pirate : SeaEntityBase, IShipOwner
         wealth = Mathf.Max(0f, wealth + amount);
     }
 
-    public override void SetFaction(FactionType newFaction)
+     public override void SetFaction(FactionType newFaction)
     {
         // If this is our first initialization, use the direct path
          if (!hasInitializedFaction)
@@ -180,9 +184,8 @@ public class Pirate : SeaEntityBase, IShipOwner
         if (!ownedShips.Contains(ship))
         {
             ownedShips.Add(ship);
-            ship.SetOwner(this);
-            // Re-initialize ship with pirate as the owner, because this ship was probably spawned before this pirate
-            ship.Initialize(Faction, ship.Name, this);
+             // Re-initialize ship with pirate as the owner, because this ship was probably spawned before this pirate
+            ship.Initialize(ship.Name, Faction, this);
             Debug.Log($"Added ship {ship.ShipName()} to {GetType().Name}'s fleet");
         }
     }
@@ -198,9 +201,9 @@ public class Pirate : SeaEntityBase, IShipOwner
         if (ownedShips.Contains(ship))
         {
             ownedShips.Remove(ship);
-            if (ReferenceEquals(ship.ShipOwner, this))
+             if (ReferenceEquals(ship.Owner, this))
             {
-                ship.ClearOwner();
+                 ship.SetOwner(null);
             }
             Debug.Log($"Removed ship {ship.ShipName()} from {GetType().Name}'s fleet");
         }
@@ -243,7 +246,7 @@ public class Pirate : SeaEntityBase, IShipOwner
         {
             if (ship != null)
             {
-                ship.Initialize(newFaction, ship.Name, this);
+                ship.Initialize(ship.Name, newFaction, this);
             }
         }
     }
