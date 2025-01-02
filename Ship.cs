@@ -34,6 +34,7 @@ public class Ship : SeaEntityBase, IOwnable
 
     // Use 'new' keyword to acknowledge hiding and to use own implementation:
     public new IEntityOwner Owner => _owner;
+     //Removed field serialization
     private FactionType _faction = FactionType.None;
     public new FactionType Faction => _faction;
 
@@ -136,7 +137,8 @@ public class Ship : SeaEntityBase, IOwnable
 
       public override void SetFaction(FactionType newFaction)
     {
-       _faction = newFaction;
+        base.SetFaction(newFaction); // Call base implementation
+        _faction = newFaction;
           if (FactionManager.Instance != null)
          {
              // Update visuals or other faction-specific visuals

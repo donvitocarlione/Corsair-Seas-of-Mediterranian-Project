@@ -10,7 +10,7 @@ namespace CSM.Base
         [SerializeField] protected float maxHealth = 100f;
 
         private float _currentHealth;
-        private FactionType _faction;
+       // Removed the _faction;
         private bool _isInitialized;
         private IEntityOwner _owner; // New field: Owner
 
@@ -24,7 +24,8 @@ namespace CSM.Base
         public float MaxHealth => maxHealth;
         public float CurrentHealth => _currentHealth;
 
-        public FactionType Faction
+       // Removed Faction Property
+       /* public FactionType Faction
         {
             get => _faction;
             protected set
@@ -37,6 +38,7 @@ namespace CSM.Base
                 }
             }
         }
+       */
 
         public bool IsAlive => _currentHealth > 0;
         public bool IsInitialized => _isInitialized;
@@ -89,7 +91,8 @@ namespace CSM.Base
                 return;
             }
                 EntityName = name;
-                SetFaction(faction);
+               // Removed set faction call
+                //SetFaction(faction);
                 Owner = owner;
                 Initialize();  // Call the existing Initialize method
             
@@ -120,21 +123,27 @@ namespace CSM.Base
                 OnHeal(_currentHealth - oldHealth);
             }
         }
-
-        public virtual void SetFaction(FactionType factionType)
+      //Removed faction set
+      /*  public virtual void SetFaction(FactionType factionType)
         {
             Faction = factionType;
         }
+       */ 
         
         //New validation methods
         public bool IsOwnedBy(IEntityOwner controller)
         {
             return Owner == controller;
         }
-
-        public bool BelongsToFaction(FactionType factionType)
+       //Removed faction validation
+       /* public bool BelongsToFaction(FactionType factionType)
         {
             return Faction == factionType;
+        }*/
+
+         public virtual void SetFaction(FactionType newFaction)
+        {
+             OnFactionChanged(newFaction, newFaction);
         }
 
         #endregion
