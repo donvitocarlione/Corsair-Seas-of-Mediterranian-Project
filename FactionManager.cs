@@ -9,14 +9,12 @@ public class FactionManager : MonoBehaviour
 {
     [SerializeField] private FactionDefinitionAsset[] factionDefinitions;
     private Dictionary<FactionType, FactionDefinition> factionData;
-    private Dictionary<FactionType, List<Ship>> factionShips;
-    private Dictionary<FactionType, List<Pirate>> factionPirates;
     private Dictionary<FactionType, IEntityOwner> factionLeaders = new Dictionary<FactionType, IEntityOwner>();
     [SerializeField] private GameObject piratePrefab;
 
 
+
     public static FactionManager Instance { get; private set; }
-    public FactionEventSystem EventSystem { get; protected set; }
     [SerializeField] protected FactionConfiguration _configuration;
     public FactionConfiguration configuration => _configuration;
 
@@ -29,8 +27,6 @@ public class FactionManager : MonoBehaviour
         {
             Debug.Log("[FactionManager] Instance is null, setting up singleton.");
             Instance = this;
-            EventSystem = new FactionEventSystem();
-            Debug.Log("[FactionManager] Event system created.");
             InitializeManager();
             Debug.Log("[FactionManager] Manager initialized.");
 
@@ -48,31 +44,12 @@ public class FactionManager : MonoBehaviour
         // Initialize collections
         factionData = new Dictionary<FactionType, FactionDefinition>();
         Debug.Log("[FactionManager] factionData dictionary initialized.");
-        factionShips = new Dictionary<FactionType, List<Ship>>();
-         Debug.Log("[FactionManager] factionShips dictionary initialized.");
-        factionPirates = new Dictionary<FactionType, List<Pirate>>();
-         Debug.Log("[FactionManager] factionPirates dictionary initialized.");
 
          // Initialize faction data
         InitializeFactionData();
         CreateFactionLeaders();
           Debug.Log("[FactionManager] Faction data initialized.");
 
-        // Initialize empty lists for each faction
-        foreach (FactionType faction in Enum.GetValues(typeof(FactionType)))
-        {
-            Debug.Log($"[FactionManager] Initializing lists for faction: {faction}");
-             if (!factionShips.ContainsKey(faction))
-            {
-              factionShips[faction] = new List<Ship>();
-               Debug.Log($"[FactionManager] Initialized factionShips list for: {faction}");
-            }
-               if (!factionPirates.ContainsKey(faction))
-            {
-                factionPirates[faction] = new List<Pirate>();
-                 Debug.Log($"[FactionManager] Initialized factionPirates list for: {faction}");
-            }
-        }
 
          ValidateInitializedFactions();
         Debug.Log("[FactionManager] Faction manager initialization complete.");
@@ -107,7 +84,8 @@ public class FactionManager : MonoBehaviour
             }
         }
     }
-    private void CreateFactionLeaders()
+
+        private void CreateFactionLeaders()
     {
         foreach (FactionType faction in Enum.GetValues(typeof(FactionType)))
         {
@@ -121,6 +99,7 @@ public class FactionManager : MonoBehaviour
             }
         }
     }
+
 
     private IEntityOwner CreateFactionLeader(FactionType faction)
     {
@@ -144,6 +123,7 @@ public class FactionManager : MonoBehaviour
         return newPirate;
 
     }
+
 
     private void ValidateInitializedFactions()
     {
@@ -179,8 +159,7 @@ public class FactionManager : MonoBehaviour
         return factionData[faction];
     }
 
-
-   public void SetFactionLeader(FactionType faction, Pirate pirate)
+       public void SetFactionLeader(FactionType faction, Pirate pirate)
     {
          Debug.Log($"[FactionManager] SetFactionLeader called for faction {faction}, pirate: {pirate?.name}");
         if (faction == FactionType.None || faction == FactionType.Independent)
@@ -204,183 +183,7 @@ public class FactionManager : MonoBehaviour
         Debug.Log($"[FactionManager] Set pirate {pirate.name} as the faction leader of {faction}");
     }
 
-      public void RegisterPirate(FactionType faction, Pirate pirate)
-    {
-        Debug.Log($"[FactionManager] RegisterPirate called for faction {faction}, pirate: {pirate?.name}");
-        if (pirate == null)
-            throw new ArgumentNullException(nameof(pirate));
-
-        if (!factionData.ContainsKey(faction))
-        {
-             Debug.LogWarning($"Faction {faction} not initialized.");
-            return;
-        }
-         Debug.Log($"[FactionManager] RegisterPirate. checking for pirates of {faction}.");
-        if (!factionPirates.ContainsKey(faction))
-            factionPirates[faction] = new List<Pirate>();
-        Debug.Log($"[FactionManager] RegisterPirate. checking if {pirate.name} exist in faction {faction}.");
-        if (!factionPirates[faction].Contains(pirate))
-        {
-            factionPirates[faction].Add(pirate);
-             Debug.Log($"[FactionManager] RegisterPirate. {pirate.name} added. Checking ships.");
-            foreach (var ship in pirate.GetOwnedShips())
-            {
-                RegisterShip(faction, ship);
-            }
-            EventSystem.Publish(faction, pirate, FactionChangeType.PirateRegistered);
-             Debug.Log($"[FactionManager] Registered pirate {pirate.name} to faction {faction}");
-        }
-        else
-        {
-             Debug.LogWarning($"Attempting to register an already registered pirate {pirate.name} to faction {faction}");
-        }
-    }
-
-
-    public void UnregisterPirate(FactionType faction, Pirate pirate)
-    {
-          Debug.Log($"[FactionManager] UnregisterPirate called for faction {faction}, pirate: {pirate?.name}");
-        if (pirate == null)
-        {
-            throw new ArgumentNullException(nameof(pirate));
-        }
-
-        if (factionPirates.TryGetValue(faction, out List<Pirate> pirates))
-        {
-            if (pirates.Remove(pirate))
-            {
-                // Unregister all ships owned by the pirate
-                foreach (var ship in pirate.GetOwnedShips())
-                {
-                    UnregisterShip(faction, ship);
-                }
-                EventSystem.Publish(faction, pirate, FactionChangeType.PirateUnregistered);
-                Debug.Log($"[FactionManager] Unregistered pirate {pirate.name} from faction {faction}");
-            }
-            else
-            {
-                Debug.LogWarning($"Attempting to unregister a pirate {pirate.name} that does not exist on faction {faction}");
-            }
-        }
-        else
-        {
-            Debug.LogWarning($"Attempting to unregister pirate from unknown faction: {faction}");
-        }
-    }
-               
-    public void RegisterShip(FactionType faction, Ship ship)
-    {
-           Debug.Log($"[FactionManager] RegisterShip called for faction {faction}, ship: {ship?.ShipName()}");
-         if (ship == null)
-            throw new ArgumentNullException(nameof(ship));
-
-
-        if (!factionData.ContainsKey(faction))
-        {
-             Debug.LogWarning($"Faction {faction} not initialized, cannot register ship.");
-            return;
-        }
-
-
-        if (ship.Faction != faction)
-        {
-            Debug.LogError($"Ship {ship.ShipName()} faction mismatch during registration. Expected {faction}, but ship has {ship.Faction}");
-            return;
-        }
-
-         if (!factionShips.ContainsKey(faction))
-         {
-             Debug.LogError($"Faction {faction} does not have a valid list of ships");
-            return;
-         }
-        factionShips[faction].Add(ship);
-         EventSystem.Publish(faction, ship, FactionChangeType.ShipRegistered);
-       Debug.Log($"Ship {ship.ShipName()} registered with faction {faction}");
-    }
-
-    public void UnregisterShip(FactionType faction, Ship ship)
-    {
-          Debug.Log($"[FactionManager] UnregisterShip called for faction {faction}, ship: {ship?.ShipName()}");
-        if (ship == null)
-        {
-            throw new ArgumentNullException(nameof(ship));
-        }
-
-        if (factionShips.TryGetValue(faction, out List<Ship> ships))
-        {
-            if(ships.Remove(ship))
-            {
-                EventSystem.Publish(faction, ship, FactionChangeType.ShipUnregistered);
-                 Debug.Log($"Unregistered ship {ship.ShipName()} from faction {faction}");
-            }
-           else
-           {
-                 Debug.LogWarning($"Attempting to unregister ship {ship.ShipName()} that does not exist in faction {faction}");
-           }
-        }
-        else
-        {
-             Debug.LogWarning($"Attempting to unregister ship from unknown faction: {faction}");
-        }
-    }
-
-
-    public void UpdateFactionRelation(FactionType faction1, FactionType faction2, float newValue)
-    {
-         Debug.Log($"[FactionManager] UpdateFactionRelation called for {faction1}, {faction2}, value: {newValue}");
-        if (faction1 == faction2)
-        {
-            throw new ArgumentException("Cannot update relation between a faction and itself!");
-        }
-
-        var faction1Data = GetFactionData(faction1);
-        var faction2Data = GetFactionData(faction2);
-
-        if (faction1Data != null && faction2Data != null)
-        {
-            float clampedValue = Mathf.Clamp(newValue, _configuration.minRelation, _configuration.maxRelation);
-
-            faction1Data.SetRelation(faction2, clampedValue);
-            faction2Data.SetRelation(faction1, clampedValue);
-
-            EventSystem.Publish(faction1, clampedValue, FactionChangeType.RelationChanged);
-
-            // Log significant relation changes
-            if (clampedValue <= _configuration.warThreshold)
-            {
-                 Debug.Log($"War conditions between {faction1} and {faction2} (Relation: {clampedValue})");
-            }
-            else if (clampedValue >= _configuration.allyThreshold)
-            {
-                 Debug.Log($"Alliance formed between {faction1} and {faction2} (Relation: {clampedValue})");
-            }
-        }
-    }
-
-
-    public void ModifyFactionInfluence(FactionType faction, int change)
-    {
-         Debug.Log($"[FactionManager] ModifyFactionInfluence called for {faction}, change: {change}");
-        if (change == 0) return;
-
-        if (factionData.TryGetValue(faction, out FactionDefinition factionDefinition))
-        {
-            int oldInfluence = factionDefinition.Influence;
-            factionDefinition.Influence = Mathf.Clamp(factionDefinition.Influence + change, 0, 100);
-
-            if (oldInfluence != factionDefinition.Influence)
-            {
-                EventSystem.Publish(faction, factionDefinition.Influence, FactionChangeType.InfluenceChanged);
-                 Debug.Log($"Updated {faction} influence from {oldInfluence} to {factionDefinition.Influence}");
-            }
-        }
-        else
-        {
-             Debug.LogWarning($"Attempting to modify influence of unknown faction: {faction}");
-        }
-    }
-
-       public void HandlePortCapture(FactionType capturingFaction, Port capturedPort)
+        public void HandlePortCapture(FactionType capturingFaction, Port capturedPort)
     {
            Debug.Log($"[FactionManager] HandlePortCapture called. Capturing faction: {capturingFaction}, captured port: {capturedPort?.name}");
         if (capturedPort == null)
@@ -401,40 +204,43 @@ public class FactionManager : MonoBehaviour
         {
             newFactionData.AddPort(capturedPort);
             capturedPort.SetFaction(capturingFaction);
-            EventSystem.Publish(capturingFaction, capturedPort, FactionChangeType.PortCaptured);
+            // EventSystem.Publish(capturingFaction, capturedPort, FactionChangeType.PortCaptured);
 
             // Update relations and influence
             if (oldFaction != FactionType.None)
             {
                 float currentRelation = GetRelationBetweenFactions(oldFaction, capturingFaction);
-                UpdateFactionRelation(oldFaction, capturingFaction, currentRelation - _configuration.captureRelationPenalty);
-                ModifyFactionInfluence(oldFaction, -_configuration.captureInfluenceChange);
-                ModifyFactionInfluence(capturingFaction, _configuration.captureInfluenceChange);
+              //  UpdateFactionRelation(oldFaction, capturingFaction, currentRelation - _configuration.captureRelationPenalty);
+              ModifyFactionInfluence(oldFaction, -_configuration.captureInfluenceChange);
+              ModifyFactionInfluence(capturingFaction, _configuration.captureInfluenceChange);
             }
         }
     }
 
-       public void RecordTradeBetweenFactions(FactionType faction1, FactionType faction2, float value)
+
+
+      public void ModifyFactionInfluence(FactionType faction, int change)
     {
-          Debug.Log($"[FactionManager] RecordTradeBetweenFactions called. {faction1}, {faction2}, value: {value}");
-        if (faction1 == faction2 || value <= 0)
+         Debug.Log($"[FactionManager] ModifyFactionInfluence called for {faction}, change: {change}");
+        if (change == 0) return;
+
+        if (factionData.TryGetValue(faction, out FactionDefinition factionDefinition))
         {
-            return;
+            int oldInfluence = factionDefinition.Influence;
+            factionDefinition.Influence = Mathf.Clamp(factionDefinition.Influence + change, 0, 100);
+
+            if (oldInfluence != factionDefinition.Influence)
+            {
+               // EventSystem.Publish(faction, factionDefinition.Influence, FactionChangeType.InfluenceChanged);
+                 Debug.Log($"Updated {faction} influence from {oldInfluence} to {factionDefinition.Influence}");
+            }
         }
-
-        var faction1Data = GetFactionData(faction1);
-        var faction2Data = GetFactionData(faction2);
-
-        if (faction1Data != null && faction2Data != null)
+        else
         {
-            float relationBonus = value * _configuration.tradeRelationMultiplier;
-            float currentRelation = faction1Data.GetRelation(faction2);
-            float newRelation = Mathf.Min(currentRelation + relationBonus, _configuration.maxRelation);
-
-            UpdateFactionRelation(faction1, faction2, newRelation);
-             Debug.Log($"Trade between {faction1} and {faction2} improved relations by {relationBonus:F1} points");
+             Debug.LogWarning($"Attempting to modify influence of unknown faction: {faction}");
         }
     }
+    
 
      public IEntityOwner GetFactionOwner(FactionType factionType)
     {
@@ -448,11 +254,11 @@ public class FactionManager : MonoBehaviour
 
 
         // If no leader exists, try to get the first pirate of that faction
-        if (factionPirates.TryGetValue(factionType, out var pirates) && pirates.Count > 0)
-        {
-             Debug.Log($"[FactionManager] Found first pirate for {factionType}: {pirates[0].name}");
-             return pirates[0];
-        }
+       // if (factionPirates.TryGetValue(factionType, out var pirates) && pirates.Count > 0)
+       // {
+        //     Debug.Log($"[FactionManager] Found first pirate for {factionType}: {pirates[0].name}");
+        //     return pirates[0];
+       // }
         Debug.LogWarning($"No Pirate owner found for faction {factionType}. Creating a new one...");
 
         // Create a new pirate for the faction if none exists
@@ -518,18 +324,6 @@ public class FactionManager : MonoBehaviour
         return relation;
     }
 
-
-     public IReadOnlyList<Ship> GetFactionShips(FactionType faction)
-    {
-        Debug.Log($"[FactionManager] GetFactionShips called for {faction}.");
-           if (factionShips.TryGetValue(faction, out List<Ship> ships))
-          {
-                Debug.Log($"[FactionManager] Returning {ships.Count} ships for faction {faction}.");
-            return ships.AsReadOnly();
-           }
-             Debug.Log($"[FactionManager] No ships found for faction {faction}. Returning empty list.");
-            return new List<Ship>().AsReadOnly();
-    }
 
      public IReadOnlyList<Port> GetFactionPorts(FactionType faction)
     {

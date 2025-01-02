@@ -6,14 +6,14 @@ public class FactionDefinition
     // Immutable properties
     public FactionType Type { get; }
     public string Name { get; }
-    public Color Color { get; }
+    public Color Color { get; set; }  // Changed to public set
 
     // Mutable properties
     public int Influence { get; internal set; } // Changed to internal set for FactionManager
 
     // Relationships
     private readonly Dictionary<FactionType, float> _relations = new();
-     public IReadOnlyDictionary<FactionType, float> Relations => _relations;
+    public IReadOnlyDictionary<FactionType, float> Relations => _relations;
 
     // Ports
     private readonly List<Port> _ports = new();
