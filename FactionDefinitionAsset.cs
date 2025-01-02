@@ -10,9 +10,7 @@ public class FactionDefinitionAsset : ScriptableObject
     public FactionDefinition GetFactionData()
     {
         // Use the constructor instead of object initialization
-        var definition = new FactionDefinition(factionType, factionName);
-        // Use internal setters
-        definition.Color = factionColor;
+        var definition = new FactionDefinition(factionType, factionName, factionColor);
         return definition;
     }
 }

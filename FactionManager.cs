@@ -9,7 +9,7 @@ public class FactionManager : MonoBehaviour
 {
     [SerializeField] private FactionDefinitionAsset[] factionDefinitions;
     private Dictionary<FactionType, FactionDefinition> factionData;
-    private Dictionary<FactionType, IEntityOwner> factionLeaders = new Dictionary<FactionType, IEntityOwner>();
+     private Dictionary<FactionType, IEntityOwner> factionLeaders = new Dictionary<FactionType, IEntityOwner>();
     [SerializeField] private GameObject piratePrefab;
 
 
@@ -47,7 +47,7 @@ public class FactionManager : MonoBehaviour
 
          // Initialize faction data
         InitializeFactionData();
-        CreateFactionLeaders();
+          CreateFactionLeaders();
           Debug.Log("[FactionManager] Faction data initialized.");
 
 
@@ -73,7 +73,7 @@ public class FactionManager : MonoBehaviour
             }
 
             var definition = asset.GetFactionData();
-            if (!factionData.ContainsKey(definition.Type))  // Note: Using Type instead of FactionType
+            if (!factionData.ContainsKey(definition.Type))
             {
                 factionData.Add(definition.Type, definition);
                 Debug.Log($"[FactionManager] Initialized faction: {definition.Type}");
@@ -85,7 +85,8 @@ public class FactionManager : MonoBehaviour
         }
     }
 
-        private void CreateFactionLeaders()
+
+     private void CreateFactionLeaders()
     {
         foreach (FactionType faction in Enum.GetValues(typeof(FactionType)))
         {
@@ -117,13 +118,12 @@ public class FactionManager : MonoBehaviour
 
          // Initialize the pirate directly
          newPirate.SetFaction(faction);
-         SetFactionLeader(faction, newPirate);
+           SetFactionLeader(faction, newPirate);
 
          Debug.Log($"[FactionManager] Created new leader for {faction}");
         return newPirate;
 
     }
-
 
     private void ValidateInitializedFactions()
     {
@@ -159,7 +159,8 @@ public class FactionManager : MonoBehaviour
         return factionData[faction];
     }
 
-       public void SetFactionLeader(FactionType faction, Pirate pirate)
+    
+        public void SetFactionLeader(FactionType faction, Pirate pirate)
     {
          Debug.Log($"[FactionManager] SetFactionLeader called for faction {faction}, pirate: {pirate?.name}");
         if (faction == FactionType.None || faction == FactionType.Independent)
@@ -242,7 +243,7 @@ public class FactionManager : MonoBehaviour
     }
     
 
-     public IEntityOwner GetFactionOwner(FactionType factionType)
+    public IEntityOwner GetFactionOwner(FactionType factionType)
     {
         Debug.Log($"[FactionManager] GetFactionOwner called for {factionType}.");
         // First try to get the faction leader
