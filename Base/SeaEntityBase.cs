@@ -10,7 +10,9 @@ namespace CSM.Base
         [SerializeField] protected float maxHealth = 100f;
 
         private float _currentHealth;
-       // Removed the _faction;
+         // Make Faction virtual in base class
+        public virtual FactionType Faction { get; protected set; } = FactionType.None;
+
         private bool _isInitialized;
         private IEntityOwner _owner; // New field: Owner
 
@@ -24,26 +26,11 @@ namespace CSM.Base
         public float MaxHealth => maxHealth;
         public float CurrentHealth => _currentHealth;
 
-       // Removed Faction Property
-       /* public FactionType Faction
+        public virtual string Name
         {
-            get => _faction;
-            protected set
-            {
-                if (_faction != value)
-                {
-                    var oldFaction = _faction;
-                    _faction = value;
-                    OnFactionChanged(oldFaction, _faction);
-                }
-            }
+            get => EntityName;
+            protected set => EntityName = value;
         }
-       */
-
-        public bool IsAlive => _currentHealth > 0;
-        public bool IsInitialized => _isInitialized;
-
-        public virtual string Name { get; protected set; }
         
         // New Property: Owner
         public IEntityOwner Owner
@@ -91,9 +78,8 @@ namespace CSM.Base
                 return;
             }
                 EntityName = name;
-               // Removed set faction call
-                //SetFaction(faction);
-                Owner = owner;
+              SetFaction(faction);
+               Owner = owner;
                 Initialize();  // Call the existing Initialize method
             
         }
@@ -123,27 +109,21 @@ namespace CSM.Base
                 OnHeal(_currentHealth - oldHealth);
             }
         }
-      //Removed faction set
-      /*  public virtual void SetFaction(FactionType factionType)
+        
+        public virtual void SetFaction(FactionType factionType)
         {
-            Faction = factionType;
+             Faction = factionType;
         }
-       */ 
         
         //New validation methods
         public bool IsOwnedBy(IEntityOwner controller)
         {
             return Owner == controller;
         }
-       //Removed faction validation
-       /* public bool BelongsToFaction(FactionType factionType)
+
+        public bool BelongsToFaction(FactionType factionType)
         {
             return Faction == factionType;
-        }*/
-
-         public virtual void SetFaction(FactionType newFaction)
-        {
-             OnFactionChanged(newFaction, newFaction);
         }
 
         #endregion

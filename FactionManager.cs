@@ -11,6 +11,7 @@ public class FactionManager : MonoBehaviour
     
     public static FactionManager Instance { get; private set; }
     [SerializeField] protected FactionConfiguration _configuration;
+    public FactionConfiguration configuration => _configuration;
     
     private void Awake()
     {
@@ -78,6 +79,13 @@ public class FactionManager : MonoBehaviour
         }
     }
 
+      public float GetRelationBetweenFactions(FactionType faction1, FactionType faction2)
+    {
+        if (faction1 == faction2) return 100f;
+        var factionData = GetFactionData(faction1);
+        return factionData?.GetRelation(faction2) ?? 50f;
+    }
+
     public Color GetFactionColor(FactionType faction)
     {
         var factionData = GetFactionData(faction);
@@ -88,5 +96,11 @@ public class FactionManager : MonoBehaviour
     {
         var factionData = GetFactionData(faction);
         return factionData?.Ports ?? new List<Port>().AsReadOnly();
+    }
+    public IEntityOwner GetFactionOwner(FactionType factionType)
+    {
+        // Simplified version
+        Debug.Log($"[FactionManager] GetFactionOwner called for {factionType}");
+        return null; // Or implement minimal version if needed
     }
 }

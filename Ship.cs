@@ -34,9 +34,8 @@ public class Ship : SeaEntityBase, IOwnable
 
     // Use 'new' keyword to acknowledge hiding and to use own implementation:
     public new IEntityOwner Owner => _owner;
-     //Removed field serialization
-    private FactionType _faction = FactionType.None;
-    public new FactionType Faction => _faction;
+    // Removed field serialization and new
+    public override FactionType Faction { get; protected set; }
 
      public new event System.Action<IEntityOwner> OnOwnerChanged;
 
@@ -96,8 +95,9 @@ public class Ship : SeaEntityBase, IOwnable
         EntityName = newName;
         Debug.Log($"[Ship] Name set to {newName} for {gameObject.name}");
     }
-     public virtual void Initialize(string shipName, FactionType faction, IEntityOwner shipOwner)
+     public override void Initialize(string shipName, FactionType faction, IEntityOwner shipOwner)
     {
+         base.Initialize(shipName, faction, shipOwner);
         if (isInitialized)
         {
              Debug.LogWarning($"[Ship] Ship {shipName} is already initialized");
@@ -108,13 +108,13 @@ public class Ship : SeaEntityBase, IOwnable
              Debug.LogError($"[Ship] Cannot initialize {shipName} - no owner provided");
             return;
         }
-         if (shipOwner.Faction != faction)
+         if (shipOwner.Faction != Faction)
         {
-            Debug.LogError($"[Ship] Owner faction {shipOwner.Faction} doesn't match ship faction {faction}");
+            Debug.LogError($"[Ship] Owner faction {shipOwner.Faction} doesn't match ship faction {Faction}");
              return;
         }
         SetName(shipName);
-        SetFaction(faction);
+        //SetFaction(faction);
         if (!SetOwner(shipOwner))
         {
             Debug.LogError($"[Ship] Failed to set owner for {shipName}");
@@ -122,11 +122,12 @@ public class Ship : SeaEntityBase, IOwnable
         }
         
          isInitialized = true;
-       Debug.Log($"[Ship] {shipName} initialized successfully with faction {faction} and owner {shipOwner.GetType().Name}");
+       Debug.Log($"[Ship] {shipName} initialized successfully with faction {Faction} and owner {shipOwner.GetType().Name}");
           if (startCalled)
         {
             OnInitializedStart();
         }
+        UpdateShipAppearance();
 
     }
       protected virtual void OnInitializedStart()
@@ -135,17 +136,17 @@ public class Ship : SeaEntityBase, IOwnable
            Debug.Log($"[Ship] Start called for {Name} after initialization");
     }
 
-      public override void SetFaction(FactionType newFaction)
+    //Removed override here since it's already virtual.
+      /*public override void SetFaction(FactionType newFaction)
     {
-        base.SetFaction(newFaction); // Call base implementation
-        _faction = newFaction;
+         base.SetFaction(newFaction);
           if (FactionManager.Instance != null)
          {
              // Update visuals or other faction-specific visuals
              UpdateShipAppearance();
          }
          Debug.Log($"[Ship] Faction set to {newFaction} for {gameObject.name}");
-    }
+    }*/
 
      private void UpdateShipAppearance()
     {
