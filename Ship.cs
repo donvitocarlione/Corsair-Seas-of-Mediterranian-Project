@@ -34,7 +34,8 @@ public class Ship : SeaEntityBase, IOwnable
 
     // Use 'new' keyword to acknowledge hiding and to use own implementation:
     public new IEntityOwner Owner => _owner;
-    public new FactionType Faction { get; private set; }
+    private FactionType _faction = FactionType.None;
+    public new FactionType Faction => _faction;
 
      public new event System.Action<IEntityOwner> OnOwnerChanged;
 
@@ -94,7 +95,7 @@ public class Ship : SeaEntityBase, IOwnable
         EntityName = newName;
         Debug.Log($"[Ship] Name set to {newName} for {gameObject.name}");
     }
-     public override void Initialize(string shipName, FactionType faction, IEntityOwner shipOwner)
+     public virtual void Initialize(string shipName, FactionType faction, IEntityOwner shipOwner)
     {
         if (isInitialized)
         {
@@ -106,7 +107,7 @@ public class Ship : SeaEntityBase, IOwnable
              Debug.LogError($"[Ship] Cannot initialize {shipName} - no owner provided");
             return;
         }
-        if (shipOwner.Faction != faction)
+         if (shipOwner.Faction != faction)
         {
             Debug.LogError($"[Ship] Owner faction {shipOwner.Faction} doesn't match ship faction {faction}");
              return;
@@ -118,11 +119,7 @@ public class Ship : SeaEntityBase, IOwnable
             Debug.LogError($"[Ship] Failed to set owner for {shipName}");
             return;
         }
-         if (FactionManager.Instance != null)
-        {
-            FactionManager.Instance.RegisterShip(faction, this);
-        }
-
+        
          isInitialized = true;
        Debug.Log($"[Ship] {shipName} initialized successfully with faction {faction} and owner {shipOwner.GetType().Name}");
           if (startCalled)
@@ -137,12 +134,34 @@ public class Ship : SeaEntityBase, IOwnable
            Debug.Log($"[Ship] Start called for {Name} after initialization");
     }
 
-    //Use override instead of hiding
-      public override void SetFaction(FactionType faction)
+      public override void SetFaction(FactionType newFaction)
     {
-        base.SetFaction(faction);
-         // Additional faction-specific logic here
-        Debug.Log($"[Ship] Faction set to {faction} for {gameObject.name}");
+       _faction = newFaction;
+          if (FactionManager.Instance != null)
+         {
+             // Update visuals or other faction-specific visuals
+             UpdateShipAppearance();
+         }
+         Debug.Log($"[Ship] Faction set to {newFaction} for {gameObject.name}");
+    }
+
+     private void UpdateShipAppearance()
+    {
+          if (FactionManager.Instance == null)
+        {
+             Debug.LogError("[Ship] No faction manager found during Ship update.");
+             return;
+        }
+        Color factionColor = FactionManager.Instance.GetFactionColor(Faction);
+        // Apply color change to all ship renderers
+         foreach (var renderer in GetComponentsInChildren<Renderer>())
+         {
+             foreach (var material in renderer.materials)
+             {
+                material.color = factionColor;
+             }
+         }
+
     }
     
     // Implement IOwnable

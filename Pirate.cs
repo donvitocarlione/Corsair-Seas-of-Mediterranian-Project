@@ -18,18 +18,18 @@ public class Pirate : SeaEntityBase, IEntityOwner, IShipOwner
     [SerializeField] protected FactionType initialFaction = FactionType.None; // New field: initial faction
     private bool hasInitializedFaction = false; // New field: initialization flag
 
+
     protected List<Ship> ownedShips;
     private bool isInitialized;
     private const float MIN_REPUTATION = 0f;
     private const float MAX_REPUTATION = 100f;
-    // Add our new registration flag alongside other state flags
-    private bool isFactionRegistered = false;
 
-    public PirateRank Rank => rank;
+    private FactionType _faction = FactionType.None;
+    public new FactionType Faction => _faction;
 
-     //Implement IEntityOwner
-     public string OwnerName => EntityName;
 
+    //Implement IEntityOwner
+    public string OwnerName => EntityName;
 
     protected override void Awake()
     {
@@ -61,21 +61,14 @@ public class Pirate : SeaEntityBase, IEntityOwner, IShipOwner
         }
 
         // Set the faction directly without going through the None state
-        base.SetFaction(faction);
-        RegisterWithFaction();
+        SetFaction(faction);
         hasInitializedFaction = true;
-        HandleFactionChanged(faction);
-
+       
         Debug.Log($"[Pirate] {name} initialized directly with faction {faction}");
     }
 
-     protected override void OnDestroy()
+    protected override void OnDestroy()
     {
-        if (isFactionRegistered)
-        {
-            UnregisterFromFaction();
-        }
-
         // Clean up ships
         if (ownedShips != null)
         {
@@ -109,68 +102,13 @@ public class Pirate : SeaEntityBase, IEntityOwner, IShipOwner
         wealth = Mathf.Max(0f, wealth + amount);
     }
 
-     public override void SetFaction(FactionType newFaction)
+      public override void SetFaction(FactionType newFaction)
     {
-        // If this is our first initialization, use the direct path
-         if (!hasInitializedFaction)
-        {
-            InitializeWithFaction(newFaction);
-            return;
-        }
-        
+          _faction = newFaction;
         // Otherwise handle normal faction changes
-        if (!Equals(newFaction, Faction))
-        {
-            UnregisterFromFaction();
-             base.SetFaction(newFaction);
-             RegisterWithFaction();
             HandleFactionChanged(newFaction);
-        }
-    }
-
-    // Keep the original method signature
-    protected void RegisterWithFaction()
-    {
-        if (FactionManager.Instance == null)
-        {
-            Debug.LogError("FactionManager instance not found!");
-            return;
-        }
-
-        // Only proceed if we haven't registered yet
-        if (!isFactionRegistered)
-        {
-            try
-            {
-                FactionManager.Instance.RegisterPirate(Faction, this);
-                isFactionRegistered = true;
-                Debug.Log($"Registered pirate with faction {Faction}");
-            }
-            catch (System.ArgumentException e)
-            {
-                Debug.LogError($"Failed to register pirate: {e.Message}");
-            }
-        }
-    }
-
-    // Keep the original method signature
-    protected void UnregisterFromFaction()
-    {
-        if (FactionManager.Instance == null) return;
-
-        if (isFactionRegistered)
-        {
-            try
-            {
-                FactionManager.Instance.UnregisterPirate(Faction, this);
-                isFactionRegistered = false;
-                Debug.Log($"Unregistered pirate from faction {Faction}");
-            }
-            catch (System.Exception e)
-            {
-                Debug.LogWarning($"Error unregistering pirate: {e.Message}");
-            }
-        }
+       
+        
     }
 
     public virtual void AddShip(Ship ship)

@@ -31,9 +31,11 @@ public class ShipManager : MonoBehaviour
 
 
     private Player playerInstance;
-    private Dictionary<Ship, FactionType> registeredShips = new Dictionary<Ship, FactionType>();
      private Dictionary<FactionType, IEntityOwner> factionOwners = new Dictionary<FactionType, IEntityOwner>();
     private Queue<(FactionType faction, int count)> pendingShipSpawns = new Queue<(FactionType, int)>();
+
+        // New dictionary for tracking ships by faction
+    private Dictionary<FactionType, List<Ship>> factionShips = new();
 
 
     #region Unity Methods
@@ -138,7 +140,7 @@ public class ShipManager : MonoBehaviour
 
         if (isInitialized)
         {
-            //InitializeAllFactions(); //Move this into the ProcessPendingShipSpawns coroutine
+           // Move ship spawning to the coroutine
         }
         else
         {
@@ -183,36 +185,7 @@ public class ShipManager : MonoBehaviour
     }
 
 
-    private void InitializeAllFactions()
-    {
-        foreach (var factionData in factionShipData)
-        {
-             if (factionData.isPlayerFaction)
-            {
-                 InitializePlayerFaction(factionData);
-            }
-            else
-            {
-                  InitializePiratesForFaction(factionData);
-            }
-
-             for (int i = 0; i < factionData.initialShipCount; i++)
-            {
-                SpawnShipForFaction(factionData.faction);
-            }
-        }
-    }
-    private void InitializePlayerFaction(FactionShipData factionData)
-    {
-        playerFaction = factionData.faction;
-    }
-    private void InitializePiratesForFaction(FactionShipData factionData)
-    {
-        for (int i = 0; i < factionData.initialPirateCount; i++)
-        {
-            SpawnPirateShip(factionData.faction);
-        }
-    }
+   
 
     #endregion
 
@@ -237,6 +210,9 @@ public class ShipManager : MonoBehaviour
         {
             string shipName = $"{faction}_Ship_{Random.Range(1000, 9999)}";
              ship.Initialize(shipName, faction, owner);
+
+                // Assign ship to faction's collection
+            AssignShipToFaction(ship, faction);
         }
 
          return ship;
@@ -300,7 +276,8 @@ public class ShipManager : MonoBehaviour
              }
             
             ship.Initialize(shipName, faction, owner);
-           
+              // Assign ship to faction's collection
+             AssignShipToFaction(ship, faction);
 
             Debug.Log($"[ShipManager] Pirate Ship {shipName} initialized and registered for faction {faction}");
         }
@@ -360,6 +337,21 @@ public class ShipManager : MonoBehaviour
         }
     #endregion
 
+     public void AssignShipToFaction(Ship ship, FactionType faction)
+    {
+        if (ship == null) return;
+
+         ship.SetFaction(faction);
+
+         if (!factionShips.ContainsKey(faction))
+         {
+             factionShips[faction] = new List<Ship>();
+         }
+         factionShips[faction].Add(ship);
+          Debug.Log($"[ShipManager] Ship {ship.ShipName()} added to faction {faction}");
+    }
+
+
     #region Existing Ship Registration
     public void RegisterPlayer(Player player)
     {
@@ -373,11 +365,6 @@ public class ShipManager : MonoBehaviour
         }
 
         playerInstance = player;
-
-         if (factionManager != null)
-        {
-              factionManager.RegisterPirate(player.Faction, player);
-         }
 
           foreach (var ship in player.GetOwnedShips())
         {
@@ -395,7 +382,7 @@ public class ShipManager : MonoBehaviour
             {
                 if (ship != null)
                 {
-                    UnregisterShip(ship);
+                   UnregisterShip(ship);
                 }                
             }
 
@@ -406,7 +393,7 @@ public class ShipManager : MonoBehaviour
 
     public void RegisterShip(Ship ship)
     {
-        if (ship == null)
+          if (ship == null)
             throw new ArgumentNullException(nameof(ship));
        if (ship.Owner == null)
         {
@@ -419,30 +406,24 @@ public class ShipManager : MonoBehaviour
             Debug.LogError($"[ShipManager] Ship {ship.Name} has mismatched owner/faction");
            return;
         }
-
-        if (!registeredShips.ContainsKey(ship))
-        {
-            registeredShips.Add(ship, ship.Faction);
-            factionManager?.RegisterShip(ship.Faction, ship);
-            Debug.Log($"[ShipManager] Ship {ship.Name} registered with faction {ship.Faction}");
-        }
+         // Assign ship to faction's collection
+        AssignShipToFaction(ship,ship.Faction);
     }
-
 
     public void UnregisterShip(Ship ship)
     {    
         if (ship == null)
             throw new System.ArgumentNullException(nameof(ship));
 
-        if (registeredShips.TryGetValue(ship, out FactionType faction))
-        {
-            registeredShips.Remove(ship);
-            if (factionManager != null)
-            {
-                factionManager.UnregisterShip(faction, ship);
-                Debug.Log($"Ship {ship.ShipName()} unregistered from faction {faction}");
-            }
-        }
+          if (factionShips.TryGetValue(ship.Faction, out List<Ship> ships))
+          {
+               if(ships.Remove(ship))
+                {
+                     Debug.Log($"[ShipManager] Ship {ship.ShipName()} unregistered from faction {ship.Faction}.");
+                }
+
+          }
+
     }
 
     public void OnShipDestroyed(Ship ship)

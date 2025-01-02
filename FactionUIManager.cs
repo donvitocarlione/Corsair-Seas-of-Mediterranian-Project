@@ -24,11 +24,11 @@ public class FactionUIManager : MonoBehaviour
     [SerializeField] private Color neutralRelationColor = Color.yellow;
     [SerializeField] private Color negativeRelationColor = Color.red;
 
+
     private void Start()
     {
         if (FactionManager.Instance != null)
         {
-            FactionManager.Instance.EventSystem.OnFactionChanged += HandleFactionChange;
             InitializeUI();
         }
         else
@@ -37,43 +37,75 @@ public class FactionUIManager : MonoBehaviour
         }
     }
 
+     private void OnEnable()
+    {
+         if (FactionManager.Instance != null)
+        {
+            UpdateUI();
+        }
+       
+    }
+     private void Update()
+    {
+        if (FactionManager.Instance != null)
+        {
+            UpdateUI();
+        }
+
+    }
+
+
     private void InitializeUI()
     {
-        foreach (var ui in factionUIs)
+         Debug.Log("[FactionUIManager] InitializeUI called.");
+         foreach (var ui in factionUIs)
         {
             try
             {
                 var factionData = FactionManager.Instance.GetFactionData(ui.faction);
-                UpdateUIElement(ui, factionData);
+                 if (factionData != null)
+                 {
+                      UpdateUIElement(ui, factionData);
+                      UpdateRelationshipUI(ui, FactionManager.Instance.GetRelationBetweenFactions(ui.faction, FactionType.Independent));
+
+                 }
+                else
+                 {
+                    Debug.LogError($"No faction data found for faction {ui.faction}");
+                }
+
             }
             catch (System.ArgumentException e)
             {
                 Debug.LogError($"Error initializing UI for faction {ui.faction}: {e.Message}");
             }
         }
+          Debug.Log("[FactionUIManager] UI Initialized.");
     }
 
-    private void HandleFactionChange(FactionType faction, object data, FactionChangeType changeType)
+    private void UpdateUI()
     {
-        var ui = factionUIs.Find(x => x.faction == faction);
-        if (ui == null) return;
-
-        switch (changeType)
+        Debug.Log("[FactionUIManager] UpdateUI called.");
+        foreach (var ui in factionUIs)
         {
-            case FactionChangeType.RelationChanged:
-                if (data is float relationValue)
-                {
-                    UpdateRelationshipUI(ui, relationValue);
-                }
-                break;
+            if (FactionManager.Instance == null)
+            {
+                 Debug.LogError($"[FactionUIManager] FactionManager not initialized.");
+                return;
+            }
+            var factionData = FactionManager.Instance.GetFactionData(ui.faction);
+             if (factionData != null)
+            {
+                 UpdateUIElement(ui, factionData);
+                UpdateRelationshipUI(ui, FactionManager.Instance.GetRelationBetweenFactions(ui.faction, FactionType.Independent));
+            }
+             else
+             {
+                Debug.LogError($"[FactionUIManager] No Faction data found for  {ui.faction}.");
+             }
 
-            case FactionChangeType.InfluenceChanged:
-                if (data is int influenceValue)
-                {
-                    UpdateInfluenceUI(ui, influenceValue);
-                }
-                break;
         }
+           Debug.Log("[FactionUIManager] UI Updated.");
     }
 
     private void UpdateUIElement(FactionUI ui, FactionDefinition factionData)
@@ -93,11 +125,7 @@ public class FactionUIManager : MonoBehaviour
             ui.flagImage.color = factionData.Color;
         }
 
-        if (ui.relationshipSlider != null)
-        {
-            ui.relationshipSlider.value = FactionManager.Instance.configuration.neutralRelation;
-            UpdateSliderColor(ui.relationshipSlider, FactionManager.Instance.configuration.neutralRelation);
-        }
+       
     }
 
     private void UpdateRelationshipUI(FactionUI ui, float newValue)
@@ -109,13 +137,6 @@ public class FactionUIManager : MonoBehaviour
         }
     }
 
-    private void UpdateInfluenceUI(FactionUI ui, int newInfluence)
-    {
-        if (ui.influenceText != null)
-        {
-            ui.influenceText.text = $"Influence: {newInfluence}%";
-        }
-    }
 
     private void UpdateSliderColor(Slider slider, float value)
     {
@@ -138,9 +159,6 @@ public class FactionUIManager : MonoBehaviour
 
     private void OnDestroy()
     {
-        if (FactionManager.Instance != null)
-        {
-            FactionManager.Instance.EventSystem.OnFactionChanged -= HandleFactionChange;
-        }
+        //No more event unsubscriptions
     }
 }
