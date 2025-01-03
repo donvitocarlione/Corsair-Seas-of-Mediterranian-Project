@@ -23,6 +23,7 @@ public class Pirate : SeaEntityBase, IEntityOwner
 
     //Implement IEntityOwner
     public string OwnerName => EntityName;
+    public override FactionType Faction { get; protected set; } // Added override here
 
     protected override void Awake()
     {
@@ -70,10 +71,11 @@ public class Pirate : SeaEntityBase, IEntityOwner
     {
         wealth = Mathf.Max(0f, wealth + amount);
     }
-
-      public override void SetFaction(FactionType newFaction)
-        {
-        }
+    
+    //Removed SetFaction
+    //  public override void SetFaction(FactionType newFaction)
+    //    {
+    //    }
 
 
     public virtual void AddShip(Ship ship)

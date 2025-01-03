@@ -20,7 +20,8 @@ public class Player : Pirate, IEntityOwner
     //Implement IEntityOwner
     public new string OwnerName => EntityName;
 
-        public override FactionType Faction { get; protected set; }
+    //Removed faction property
+   // public override FactionType Faction { get; protected set; }
 
 
     protected override void Start()
@@ -31,7 +32,7 @@ public class Player : Pirate, IEntityOwner
         if (ShipManager.Instance != null)
         {
             ShipManager.Instance.RegisterPlayer(this);
-             Debug.Log($"[Player] Initialized with faction {Faction} and registered with ShipManager");
+             Debug.Log($"[Player] Initialized and registered with ShipManager");
         }
         
         // Initialize ship list
