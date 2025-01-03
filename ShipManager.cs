@@ -62,13 +62,14 @@ public class ShipManager : MonoBehaviour
         // Queue ship spawns instead of spawning immediately
         foreach (var factionData in factionShipData)
         {
-            pendingShipSpawns.Enqueue((factionData.faction, factionData.initialShipCount));
+            // Instead of using the old method, we will just use a null faction.
+            pendingShipSpawns.Enqueue((FactionType.None, factionData.initialShipCount));
         }
 
          StartCoroutine(ProcessPendingShipSpawns());
 
     }
-    private IEnumerator ProcessPendingShipSpawns()
+     private IEnumerator ProcessPendingShipSpawns()
     {
         while (pendingShipSpawns.Count > 0)
         {
@@ -80,7 +81,7 @@ public class ShipManager : MonoBehaviour
             {
                 owner = playerInstance;
             }
-             if (owner == null)
+            if (owner == null)
             {
                  Debug.Log($"[ShipManager] Waiting for owner for faction {faction}");
                  yield return new WaitForSeconds(0.1f);
@@ -98,7 +99,6 @@ public class ShipManager : MonoBehaviour
         }
            Debug.Log("[ShipManager] All ships spawned successfully");
     }
-
 
 
     #region Initialization
@@ -203,13 +203,13 @@ public class ShipManager : MonoBehaviour
              ship.Initialize(shipName, faction, owner);
 
                 // Assign ship to faction's collection
-            AssignShipToFaction(ship, faction);
+            // AssignShipToFaction(ship, faction);
         }
 
          return ship;
     }
-
-     public Ship SpawnPirateShip(FactionType faction, Vector3? customPosition = null)
+    
+    public Ship SpawnPirateShip(FactionType faction, Vector3? customPosition = null)
     {
         if (!isInitialized)
         {
@@ -269,7 +269,7 @@ public class ShipManager : MonoBehaviour
             
             ship.Initialize(shipName, faction, owner);
               // Assign ship to faction's collection
-             AssignShipToFaction(ship, faction);
+            // AssignShipToFaction(ship, faction);
 
             Debug.Log($"[ShipManager] Pirate Ship {shipName} initialized and registered for faction {faction}");
         }
@@ -281,6 +281,7 @@ public class ShipManager : MonoBehaviour
 
         return ship;
     }
+
       private Vector3 GetSafeSpawnPosition(Vector3 center, float radius)
         {
             if (waterBody == null)
@@ -329,6 +330,7 @@ public class ShipManager : MonoBehaviour
         }
     #endregion
 
+    /*
      public void AssignShipToFaction(Ship ship, FactionType faction)
     {
         if (ship == null) return;
@@ -342,6 +344,7 @@ public class ShipManager : MonoBehaviour
          factionShips[faction].Add(ship);
           Debug.Log($"[ShipManager] Ship {ship.ShipName()} added to faction {faction}");
     }
+    */
 
 
     #region Existing Ship Registration
@@ -387,19 +390,22 @@ public class ShipManager : MonoBehaviour
     {
           if (ship == null)
             throw new ArgumentNullException(nameof(ship));
-       if (ship.Owner == null)
+       if (ship.Owner
+        == null)
         {
              Debug.LogError($"[ShipManager] Ship {ship.Name} has no owner during registration");
             return;
         }
 
+        /*
         if (ship.Owner.Faction != ship.Faction)
         {
             Debug.LogError($"[ShipManager] Ship {ship.Name} has mismatched owner/faction");
            return;
         }
+        */
          // Assign ship to faction's collection
-        AssignShipToFaction(ship,ship.Faction);
+        // AssignShipToFaction(ship,ship.Faction);
     }
 
     public void UnregisterShip(Ship ship)
@@ -407,6 +413,7 @@ public class ShipManager : MonoBehaviour
         if (ship == null)
             throw new System.ArgumentNullException(nameof(ship));
 
+          /*
           if (factionShips.TryGetValue(ship.Faction, out List<Ship> ships))
           {
                if(ships.Remove(ship))
@@ -415,6 +422,7 @@ public class ShipManager : MonoBehaviour
                 }
 
           }
+          */
 
     }
 
@@ -431,9 +439,16 @@ public class ShipManager : MonoBehaviour
     #endregion
 
     #region Helper Methods
-    private FactionShipData GetFactionShipData(FactionType faction)
+    /*
+     private FactionShipData GetFactionShipData(FactionType faction)
     {
         return factionShipData.FirstOrDefault(data => data.faction == faction);
+    }
+    */
+
+    private FactionShipData GetFactionShipData(FactionType faction)
+    {
+        return factionShipData.FirstOrDefault();
     }
 
     void OnValidate()
@@ -447,35 +462,35 @@ public class ShipManager : MonoBehaviour
     [System.Serializable]
     public class FactionShipData
     {
-        public FactionType faction;
+        //  public FactionType faction;
         public List<GameObject> shipPrefabs;
         public Vector3 spawnArea;
         public float spawnRadius = 100f;
         public int initialShipCount = 3;
-        public bool isPlayerFaction;
+        //  public bool isPlayerFaction;
         public int initialPirateCount = 2;
         public bool Validate()
         {
             if (shipPrefabs == null || shipPrefabs.Count == 0)
             {
-                Debug.LogError($"[ShipManager] No ship prefabs for faction {faction}.");
+                // Debug.LogError($"[ShipManager] No ship prefabs for faction {faction}.");
                 return false;
             }
 
             if (initialShipCount < 0)
             {
-                Debug.LogError($"[ShipManager] Initial ship count must be a positive value for faction {faction}.");
+                //Debug.LogError($"[ShipManager] Initial ship count must be a positive value for faction {faction}.");
                 return false;
             }
 
             if (initialPirateCount < 0)
             {
-                Debug.LogError($"[ShipManager] Initial pirate count must be a positive value for faction {faction}.");
+                // Debug.LogError($"[ShipManager] Initial pirate count must be a positive value for faction {faction}.");
                 return false;
             }
             if (spawnRadius <= 0)
             {
-                Debug.LogError($"[ShipManager] Spawn radius must be a positive value for faction {faction}.");
+                //Debug.LogError($"[ShipManager] Spawn radius must be a positive value for faction {faction}.");
                 return false;
             }
             return true;
