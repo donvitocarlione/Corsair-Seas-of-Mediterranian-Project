@@ -1,3 +1,4 @@
+// Ship.cs
 using UnityEngine;
 using System.Collections;
 using UnityEngine.Events;
@@ -136,17 +137,6 @@ public class Ship : SeaEntityBase, IOwnable
            Debug.Log($"[Ship] Start called for {Name} after initialization");
     }
 
-    //Removed override here since it's already virtual.
-      /*public override void SetFaction(FactionType newFaction)
-    {
-         base.SetFaction(newFaction);
-          if (FactionManager.Instance != null)
-         {
-             // Update visuals or other faction-specific visuals
-             UpdateShipAppearance();
-         }
-         Debug.Log($"[Ship] Faction set to {newFaction} for {gameObject.name}");
-    }*/
 
      private void UpdateShipAppearance()
     {
@@ -180,21 +170,10 @@ public class Ship : SeaEntityBase, IOwnable
         }
 
         // Handle old owner cleanup
-        if (_owner != null)
-        {
-            if (_owner is IShipOwner oldShipOwner)
-            {
-                oldShipOwner.RemoveShip(this);
-            }
-        }
-
         _owner = newOwner;
 
         // Handle new owner setup
-        if (_owner is IShipOwner shipOwner)
-        {
-            shipOwner.AddShip(this);
-        }
+        
 
          Debug.Log($"[Ship] {Name} owner changed to {(_owner != null ? _owner.GetType().Name : "none")}");
          // Use new event:
@@ -205,11 +184,7 @@ public class Ship : SeaEntityBase, IOwnable
     public virtual void ClearOwner()
     {
         Debug.Log($"[Ship] Clearing owner for {gameObject.name}");
-         if (_owner is IShipOwner shipOwner)
-        {
-           shipOwner.RemoveShip(this);
-        }
-        _owner = null;
+         _owner = null;
     }
 
     public virtual void Select()

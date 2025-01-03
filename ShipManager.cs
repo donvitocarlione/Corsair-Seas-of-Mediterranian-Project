@@ -45,7 +45,7 @@ public class ShipManager : MonoBehaviour
             Instance = this;
             DontDestroyOnLoad(gameObject);
             // Initialize manager only after ensuring factions are ready
-            StartCoroutine(InitializeManagerWhenFactionsReady());
+            StartCoroutine(InitializeManagerWhenReady());
         }
         else
         {
@@ -54,17 +54,11 @@ public class ShipManager : MonoBehaviour
     }
     #endregion
 
-     private IEnumerator InitializeManagerWhenFactionsReady()
+     private IEnumerator InitializeManagerWhenReady()
     {
         // Wait one frame to ensure FactionManager's Awake has completed
         yield return null;
 
-        // Verify all required factions are initialized before proceeding
-        if (!VerifyFactionsInitialized())
-        {
-            Debug.LogError("[ShipManager] Cannot initialize - some factions are not ready!");
-            yield break;
-        }
         // Queue ship spawns instead of spawning immediately
         foreach (var factionData in factionShipData)
         {
@@ -106,19 +100,6 @@ public class ShipManager : MonoBehaviour
     }
 
 
-    private bool VerifyFactionsInitialized()
-    {
-        // Check each faction type that we need
-        foreach (FactionType factionType in Enum.GetValues(typeof(FactionType)))
-        {
-            if (!factionManager.IsFactionInitialized(factionType))
-            {
-                Debug.LogError($"[ShipManager] Faction not initialized: {factionType}");
-                return false;
-            }
-        }
-        return true;
-    }
 
     #region Initialization
       private void InitializeManager()

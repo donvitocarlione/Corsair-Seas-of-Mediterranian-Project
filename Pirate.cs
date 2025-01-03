@@ -1,10 +1,11 @@
+// Pirate.cs
 using UnityEngine;
 using System.Collections.Generic;
 using CSM.Base;
 using static ShipExtensions;
 
 [AddComponentMenu("Game/Pirate")]
-public class Pirate : SeaEntityBase, IEntityOwner, IShipOwner
+public class Pirate : SeaEntityBase, IEntityOwner
 {
     [Header("Pirate Identity")]
     [SerializeField] private string pirateName;
@@ -86,8 +87,8 @@ public class Pirate : SeaEntityBase, IEntityOwner, IShipOwner
         if (!ownedShips.Contains(ship))
         {
             ownedShips.Add(ship);
-             // Re-initialize ship with pirate as the owner, because this ship was probably spawned before this pirate
-            ship.Initialize(ship.Name, Faction, this);
+            // Re-initialize ship with pirate as the owner, because this ship was probably spawned before this pirate
+             ship.Initialize(ship.Name, Faction, this);
             Debug.Log($"Added ship {ship.ShipName()} to {GetType().Name}'s fleet");
         }
     }
@@ -103,11 +104,11 @@ public class Pirate : SeaEntityBase, IEntityOwner, IShipOwner
         if (ownedShips.Contains(ship))
         {
             ownedShips.Remove(ship);
-             if (ReferenceEquals(ship.Owner, this))
+            if (ReferenceEquals(ship.Owner, this))
             {
-                 ship.SetOwner(null);
+                ship.SetOwner(null);
             }
-            Debug.Log($"Removed ship {ship.ShipName()} from {GetType().Name}'s fleet");
+             Debug.Log($"Removed ship {ship.ShipName()} from {GetType().Name}'s fleet");
         }
     }
 
@@ -132,7 +133,7 @@ public class Pirate : SeaEntityBase, IEntityOwner, IShipOwner
         }
     }
 
-    public List<Ship> GetOwnedShips()
+     public List<Ship> GetOwnedShips()
     {
         return new List<Ship>(ownedShips);
     }

@@ -1,3 +1,4 @@
+// Port.cs
 using UnityEngine;
 using CSM.Base;
 
@@ -29,31 +30,8 @@ public class Port : SeaEntityBase
         }
     }
 
-    protected override void Start()
+     protected override void OnDestroy()
     {
-        base.Start();
-        
-        // Register with initial faction
-        if (owningFaction != FactionType.None && FactionManager.Instance != null)
-        {
-            var factionData = FactionManager.Instance.GetFactionData(owningFaction);
-            if (factionData != null)
-            {
-                factionData.AddPort(this);
-            }
-        }
-    }
-
-    protected override void OnDestroy()
-    {
-        // Unregister from current faction
-        if (owningFaction != FactionType.None && FactionManager.Instance != null)
-        {
-            var factionData = FactionManager.Instance.GetFactionData(owningFaction);
-            if (factionData != null)
-            {
-                factionData.RemovePort(this);
-            }
-        }
+      
     }
 }
