@@ -83,7 +83,12 @@ namespace CSM.Base
                 Initialize();  // Call the existing Initialize method
             
         }
-
+       public virtual bool SetName(string newName)
+         {
+            EntityName = newName;
+            Debug.Log($"[{GetType().Name}] Name set to {newName}");
+             return true;
+         }
         public virtual void TakeDamage(float damage, SeaEntityBase attacker)
         {
             if (!IsAlive) return;

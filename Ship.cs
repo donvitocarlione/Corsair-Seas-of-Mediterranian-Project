@@ -90,11 +90,12 @@ public class Ship : SeaEntityBase, IOwnable
         base.Start();
     }
 
-    public virtual void SetName(string newName)
-    {
-        EntityName = newName;
-        Debug.Log($"[Ship] Name set to {newName} for {gameObject.name}");
-    }
+     public override bool SetName(string newName)
+     {
+         EntityName = newName;
+         Debug.Log($"[Ship] Name set to {newName} for {gameObject.name}");
+          return true; // Add this line
+     }
     
     public override void Initialize(string shipName, IEntityOwner shipOwner)
     {
