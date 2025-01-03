@@ -1,15 +1,12 @@
 // Interfaces/IOwnable.cs
+using CSM.Base;
+
 public interface IOwnable
 {
     /// <summary>
     /// The current owner of this entity
     /// </summary>
     IEntityOwner Owner { get; }
-
-    /// <summary>
-    /// The faction of this entity.
-    /// </summary>
-    FactionType Faction { get; }
 
     /// <summary>
     /// Change the owner of this entity

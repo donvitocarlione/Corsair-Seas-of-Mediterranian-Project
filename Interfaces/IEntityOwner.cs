@@ -1,6 +1,7 @@
 // Interfaces/IEntityOwner.cs
+using CSM.Base;
+
 public interface IEntityOwner
 {
     string OwnerName { get; }
-    FactionType Faction { get; }
 }

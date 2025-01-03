@@ -2,7 +2,7 @@ using UnityEngine;
 
 namespace CSM.Base
 {
-    public abstract class SeaEntityBase : MonoBehaviour
+    public class SeaEntityBase : MonoBehaviour
     {
         #region Fields and Properties
 
@@ -10,9 +10,7 @@ namespace CSM.Base
         [SerializeField] protected float maxHealth = 100f;
 
         private float _currentHealth;
-         // Make Faction virtual in base class
-        public virtual FactionType Faction { get; protected set; } = FactionType.None;
-
+        //Removed Faction
         private bool _isInitialized;
         private IEntityOwner _owner; // New field: Owner
         public bool IsAlive => CurrentHealth > 0;
@@ -28,7 +26,7 @@ namespace CSM.Base
         public float MaxHealth => maxHealth;
         public float CurrentHealth => _currentHealth;
 
-        public virtual string Name
+         public virtual string Name
         {
             get => EntityName;
             protected set => EntityName = value;
@@ -72,7 +70,8 @@ namespace CSM.Base
 
         #region Public Methods
 
-          public virtual void Initialize(string name, FactionType faction, IEntityOwner owner)
+        //removed faction parameter
+        public virtual void Initialize(string name, IEntityOwner owner)
         {
              if (_isInitialized)
             {
@@ -80,7 +79,6 @@ namespace CSM.Base
                 return;
             }
                 EntityName = name;
-              SetFaction(faction);
                Owner = owner;
                 Initialize();  // Call the existing Initialize method
             
@@ -111,23 +109,13 @@ namespace CSM.Base
                 OnHeal(_currentHealth - oldHealth);
             }
         }
-        
-        public virtual void SetFaction(FactionType factionType)
-        {
-             Faction = factionType;
-        }
+    
         
         //New validation methods
         public bool IsOwnedBy(IEntityOwner controller)
         {
             return Owner == controller;
         }
-
-        public bool BelongsToFaction(FactionType factionType)
-        {
-            return Faction == factionType;
-        }
-
         #endregion
 
         #region Protected Methods
@@ -176,11 +164,6 @@ namespace CSM.Base
         protected virtual void OnCleanup()
         {
             Debug.Log($"[{GetType().Name}] {entityName} cleaned up");
-        }
-
-        protected virtual void OnFactionChanged(FactionType oldFaction, FactionType newFaction)
-        {
-            Debug.Log($"[{GetType().Name}] {entityName} faction changed from {oldFaction} to {newFaction}");
         }
 
         protected virtual void OnTakeDamage(float damage, SeaEntityBase attacker)

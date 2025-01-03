@@ -23,7 +23,8 @@ public class Pirate : SeaEntityBase, IEntityOwner
 
     //Implement IEntityOwner
     public string OwnerName => EntityName;
-    public override FactionType Faction { get; protected set; } // Changed set to protected
+    // removed Faction property
+     
 
     protected override void Awake()
     {
@@ -86,7 +87,7 @@ public class Pirate : SeaEntityBase, IEntityOwner
         {
             ownedShips.Add(ship);
             // Re-initialize ship with pirate as the owner, because this ship was probably spawned before this pirate
-             ship.Initialize(ship.Name, Faction, this);
+             ship.Initialize(ship.Name, this);
             Debug.Log($"Added ship {ship.ShipName()} to {GetType().Name}'s fleet");
         }
     }
