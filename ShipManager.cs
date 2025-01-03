@@ -31,7 +31,6 @@ public class ShipManager : MonoBehaviour
 
 
     private Player playerInstance;
-     private Dictionary<FactionType, IEntityOwner> factionOwners = new Dictionary<FactionType, IEntityOwner>();
     private Queue<(FactionType faction, int count)> pendingShipSpawns = new Queue<(FactionType, int)>();
 
         // New dictionary for tracking ships by faction
@@ -82,15 +81,20 @@ public class ShipManager : MonoBehaviour
             var (faction, count) = pendingShipSpawns.Peek();
 
             // Wait for faction owner to be available
-            var owner = faction == playerFaction ? playerInstance : factionManager.GetFactionOwner(faction);
-            if (owner == null)
+           IEntityOwner owner = null;
+           if(faction == playerFaction)
             {
-                Debug.Log($"[ShipManager] Waiting for owner for faction {faction}");
-                yield return new WaitForSeconds(0.1f);
-                continue;
+                owner = playerInstance;
             }
+             if (owner == null)
+            {
+                 Debug.Log($"[ShipManager] Waiting for owner for faction {faction}");
+                 yield return new WaitForSeconds(0.1f);
+                 continue;
+            }
+            
             pendingShipSpawns.Dequeue();
-            factionOwners[faction] = owner;
+
 
             for (int i = 0; i < count; i++)
             {
@@ -193,13 +197,19 @@ public class ShipManager : MonoBehaviour
     //Modified to use Faction Owner instead of just Faction type.
       public Ship SpawnShipForFaction(FactionType faction, Vector3? customPosition = null)
     {
-        if (!isInitialized || !factionOwners.ContainsKey(faction))
+        if (!isInitialized)
         {
              pendingShipSpawns.Enqueue((faction,1));
              return null;
         }
-       var owner = faction == playerFaction ? playerInstance : factionOwners[faction];
-        Debug.Log($"[ShipManager] Spawning ship for {faction} with owner {owner.GetType().Name}");
+        
+       IEntityOwner owner = null;
+        if (faction == playerFaction)
+        {
+           owner = playerInstance;
+        }
+       
+        Debug.Log($"[ShipManager] Spawning ship for {faction} with owner {owner?.GetType().Name}");
          var factionData = GetFactionShipData(faction);
           var prefab = factionData.shipPrefabs[Random.Range(0, factionData.shipPrefabs.Count)];
           var position = customPosition ?? GetSafeSpawnPosition(factionData.spawnArea, factionData.spawnRadius);
@@ -267,12 +277,13 @@ public class ShipManager : MonoBehaviour
         if (ship != null)
         {
              string shipName = $"{faction}_Pirate_{Random.Range(1000, 9999)}";
-              IEntityOwner owner = factionManager.GetFactionOwner(faction);
+              //IEntityOwner owner = factionManager.GetFactionOwner(faction); // Removed line
+              IEntityOwner owner = null; // Instead of getting the owner, we just use a null value.
              if (owner == null)
             {
-                Debug.LogError($"[ShipManager] Could not get or create Pirate owner for faction {faction}");
-                Destroy(shipInstance);
-                 return null;
+                Debug.LogWarning($"[ShipManager] Could not get or create Pirate owner for faction {faction}");
+                //Destroy(shipInstance); // Removed to ensure we can use default faction behavior
+                 //return null; // Removed to ensure we can use default faction behavior
              }
             
             ship.Initialize(shipName, faction, owner);

@@ -15,6 +15,8 @@ namespace CSM.Base
 
         private bool _isInitialized;
         private IEntityOwner _owner; // New field: Owner
+        public bool IsAlive => CurrentHealth > 0;
+
 
         // Modified EntityName to be settable
         public virtual string EntityName
