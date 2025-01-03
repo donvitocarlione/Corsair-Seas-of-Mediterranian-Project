@@ -15,21 +15,22 @@ public class Player : Pirate, IEntityOwner
     public event System.Action<Ship> OnShipDeselected;
 
     public Ship SelectedShip => selectedShip;
+
     //Implement IEntityOwner
     public new string OwnerName => EntityName;
 
+        public override FactionType Faction { get; protected set; }
 
 
     protected override void Start()
     {
         // Don't call base.Start() as we want to handle faction differently
-        InitializeWithFaction(initialFaction);
         
         // Register with ship manager after faction is set
         if (ShipManager.Instance != null)
         {
             ShipManager.Instance.RegisterPlayer(this);
-            Debug.Log($"[Player] Initialized with faction {Faction} and registered with ShipManager");
+             Debug.Log($"[Player] Initialized with faction {Faction} and registered with ShipManager");
         }
         
         // Initialize ship list
@@ -90,61 +91,7 @@ public class Player : Pirate, IEntityOwner
         inputManager?.OnShipSelected(ship);
     }
 
-    public override void AddShip(Ship ship)
-    {
-        if (ship == null)
-        {
-            Debug.LogError("Attempting to add a null ship!");
-            return;
-        }
 
-        base.AddShip(ship);
-        
-        // Update UI if available
-        shipSelectionUI?.UpdateShipList(GetOwnedShips());
-
-        // Auto-select if this is the first ship
-        if (selectedShip == null && ownedShips.Count == 1)
-        {
-            SelectShip(ship);
-        }
-    }
-
-    public override void RemoveShip(Ship ship)
-    {
-        if (ship == null)
-        {
-            Debug.LogError("Attempting to remove a null ship!");
-            return;
-        }
-
-        if (ship == selectedShip)
-        {
-            selectedShip = null;
-            OnShipDeselected?.Invoke(ship);
-            inputManager?.OnShipSelected(null);
-        }
-
-        base.RemoveShip(ship);
-        
-        shipSelectionUI?.UpdateShipList(GetOwnedShips());
-
-        // Auto-select another ship if available
-        if (selectedShip == null && ownedShips.Count > 0)
-        {
-            SelectShip(ownedShips[0]);
-        }
-    }
-
-    public void SelectNextShip()
-    {
-        if (ownedShips.Count == 0) return;
-        
-        int currentIndex = selectedShip != null ? ownedShips.IndexOf(selectedShip) : -1;
-        int nextIndex = (currentIndex + 1) % ownedShips.Count;
-        
-        SelectShip(ownedShips[nextIndex]);
-    }
     
     public void MoveShipsInFormation(Vector3 targetPosition)
     {

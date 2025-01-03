@@ -15,18 +15,10 @@ public class Pirate : SeaEntityBase, IEntityOwner, IShipOwner
     [SerializeField, Min(0f), Tooltip("Current wealth in gold coins")]
     protected float wealth = 1000f;
 
-    [SerializeField] protected FactionType initialFaction = FactionType.None; // New field: initial faction
-    private bool hasInitializedFaction = false; // New field: initialization flag
-
-
     protected List<Ship> ownedShips;
     private bool isInitialized;
     private const float MIN_REPUTATION = 0f;
     private const float MAX_REPUTATION = 100f;
-
-    private FactionType _faction = FactionType.None;
-    public new FactionType Faction => _faction;
-
 
     //Implement IEntityOwner
     public string OwnerName => EntityName;
@@ -40,32 +32,8 @@ public class Pirate : SeaEntityBase, IEntityOwner, IShipOwner
     protected override void Start()
     {
         base.Start();
+     }
 
-        // Only initialize faction if we haven't already
-        if (!hasInitializedFaction)
-        {
-            // If we're the player, let the player handling take care of it
-            if (!(this is Player))
-            {
-                InitializeWithFaction(initialFaction);
-            }
-        }
-    }
-
-    protected void InitializeWithFaction(FactionType faction)
-    {
-        if (hasInitializedFaction)
-        {
-            Debug.LogWarning($"[Pirate] Attempting to initialize faction for {name} when already initialized!");
-            return;
-        }
-
-        // Set the faction directly without going through the None state
-        SetFaction(faction);
-        hasInitializedFaction = true;
-       
-        Debug.Log($"[Pirate] {name} initialized directly with faction {faction}");
-    }
 
     protected override void OnDestroy()
     {
@@ -103,13 +71,9 @@ public class Pirate : SeaEntityBase, IEntityOwner, IShipOwner
     }
 
       public override void SetFaction(FactionType newFaction)
-    {
-          _faction = newFaction;
-        // Otherwise handle normal faction changes
-            HandleFactionChanged(newFaction);
-       
-        
-    }
+        {
+        }
+
 
     public virtual void AddShip(Ship ship)
     {
@@ -171,29 +135,5 @@ public class Pirate : SeaEntityBase, IEntityOwner, IShipOwner
     public List<Ship> GetOwnedShips()
     {
         return new List<Ship>(ownedShips);
-    }
-
-    protected virtual void HandleFactionChanged(FactionType newFaction)
-    {
-        Debug.Log($"{GetType().Name}'s faction changed to {newFaction}");
-
-        if (ownedShips == null) return;
-
-        // Update faction for all owned ships
-        foreach (var ship in ownedShips.ToArray())
-        {
-            if (ship != null)
-            {
-                ship.Initialize(ship.Name, newFaction, this);
-            }
-        }
-    }
-        // Add method to handle faction leadership setup
-    public void SetupAsFactionLeader(FactionType faction)
-    {
-        SetFaction(faction);
-       SetRank(PirateRank.FactionLeader);
-        // Additional leader setup logic
-        Debug.Log($"Pirate {name} set up as faction leader for {faction}");
     }
 }

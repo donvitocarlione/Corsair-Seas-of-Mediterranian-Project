@@ -81,13 +81,15 @@ public class FactionManager : MonoBehaviour
 
     public Color GetFactionColor(FactionType faction)
     {
-        var factionData = GetFactionData(faction);
-        return factionData?.Color ?? Color.gray;
+        //var factionData = GetFactionData(faction);
+        //return factionData?.Color ?? Color.gray;
+        return Color.gray; // Return default gray
     }
 
     public IReadOnlyList<Port> GetFactionPorts(FactionType faction)
-    {
-        var factionData = GetFactionData(faction);
-        return factionData?.Ports ?? new List<Port>().AsReadOnly();
-    }
+        {
+            //var factionData = GetFactionData(faction);
+            //return factionData?.Ports ?? new List<Port>().AsReadOnly();
+            return new List<Port>().AsReadOnly(); // Return empty list
+        }
 }
