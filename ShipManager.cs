@@ -1,10 +1,10 @@
 using UnityEngine;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using CSM.Base;
 using Random = UnityEngine.Random;
-using System.Collections;
 
 [AddComponentMenu("Game/Ship Manager")]
 public class ShipManager : MonoBehaviour
@@ -21,10 +21,9 @@ public class ShipManager : MonoBehaviour
     private bool isInitialized;
     private WaterBody waterBody;
 
-
-
     #region Unity Methods
-    void Awake()
+
+    private void Awake()
     {
         if (Instance == null)
         {
@@ -37,11 +36,15 @@ public class ShipManager : MonoBehaviour
             Destroy(gameObject);
         }
     }
+
     #endregion
+
+    #region Initialization
 
     private IEnumerator InitializeManager()
     {
         yield return null;
+
         CreateContainers();
         InitializeWaterBody();
         isInitialized = ValidateConfiguration();
@@ -59,33 +62,27 @@ public class ShipManager : MonoBehaviour
     {
         shipsParent = new GameObject("Ships Container").transform;
         shipsParent.SetParent(transform);
-
     }
 
-     private bool ValidateConfiguration()
+    private bool ValidateConfiguration()
     {
-        if (initialShipData == null)
+        if (initialShipData == null || initialShipData.Count == 0)
         {
             Debug.LogError("[ShipManager] No initial ship data provided.");
             return false;
         }
-        if (initialShipData.Count == 0)
-        {
-          Debug.LogError("[ShipManager] Initial ship data list is empty");
-          return false;
-        }
+
         foreach (var data in initialShipData)
         {
             if (!data.Validate())
             {
-              Debug.LogError($"[ShipManager] Invalid Ship Data: {data}");
                 return false;
             }
         }
 
         return true;
     }
-    
+
     private void InitializeWaterBody()
     {
         waterBody = FindAnyObjectByType<WaterBody>();
@@ -95,14 +92,15 @@ public class ShipManager : MonoBehaviour
         }
     }
 
+    #endregion
 
+    #region Ship Spawning
 
     public Ship SpawnShip(IEntityOwner owner, GameObject prefab, Vector3? customPosition = null)
     {
-
         if (!isInitialized)
         {
-            Debug.LogError($"[ShipManager] Cannot spawn ship - manager is not initialized");
+            Debug.LogError("[ShipManager] Cannot spawn ship - manager is not initialized");
             return null;
         }
 
@@ -121,7 +119,7 @@ public class ShipManager : MonoBehaviour
         var shipData = GetInitialShipData();
         if (shipData == null)
         {
-            Debug.LogError($"[ShipManager] No ship data found!");
+            Debug.LogError("[ShipManager] No ship data found!");
             return null;
         }
 
@@ -133,11 +131,11 @@ public class ShipManager : MonoBehaviour
         else
         {
             spawnPosition = GetSafeSpawnPosition(shipData.spawnArea, shipData.spawnRadius);
-              if (spawnPosition == Vector3.zero)
-             {
-                    Debug.LogWarning($"[ShipManager] No available position found. Cannot spawn ship.");
+            if (spawnPosition == Vector3.zero)
+            {
+                Debug.LogWarning("[ShipManager] No available position found. Cannot spawn ship.");
                 return null;
-             }
+            }
         }
 
         occupiedPositions.Add(spawnPosition);
@@ -152,13 +150,12 @@ public class ShipManager : MonoBehaviour
         }
         else
         {
-            Debug.LogError($"[ShipManager] Could not find Ship component on prefab!");
+            Debug.LogError("[ShipManager] Could not find Ship component on prefab!");
             Destroy(shipInstance);
         }
 
         return ship;
     }
-
 
     private Vector3 GetSafeSpawnPosition(Vector3 center, float radius)
     {
@@ -187,8 +184,8 @@ public class ShipManager : MonoBehaviour
             waterSurfaceHeight,
             center.z + Random.Range(-radius * 0.5f, radius * 0.5f)
         );
-         Debug.LogWarning($"[ShipManager] Could not find safe position after {maxSpawnAttempts} attempts. Using fallback position: {fallbackPosition}");
-         return fallbackPosition;
+        Debug.LogWarning($"[ShipManager] Could not find safe position after {maxSpawnAttempts} attempts. Using fallback position: {fallbackPosition}");
+        return fallbackPosition;
     }
 
     private bool IsSafePosition(Vector3 position)
@@ -206,7 +203,7 @@ public class ShipManager : MonoBehaviour
     public void UnregisterShip(Ship ship)
     {
         if (ship == null)
-            throw new System.ArgumentNullException(nameof(ship));
+            throw new ArgumentNullException(nameof(ship));
     }
 
     public void OnShipDestroyed(Ship ship)
@@ -219,21 +216,31 @@ public class ShipManager : MonoBehaviour
         }
     }
 
+    #endregion
+
     #region Helper Methods
+
     private InitialShipData GetInitialShipData()
     {
         return initialShipData.FirstOrDefault();
     }
 
-    void OnValidate()
+    private void OnValidate()
     {
         if (minSpawnDistance < 0) minSpawnDistance = 50f;
         if (maxSpawnAttempts < 1) maxSpawnAttempts = 10;
     }
+
+    #endregion
+
+    #region Properties
+
     public bool IsInitialized => isInitialized;
+
     #endregion
 
     #region Editor Classes
+
     [System.Serializable]
     public class InitialShipData
     {
@@ -243,29 +250,37 @@ public class ShipManager : MonoBehaviour
         public int initialShipCount = 3;
         public int initialPirateCount = 2;
 
-
         public bool Validate()
         {
-            if (shipPrefabs == null || shipPrefabs.Count == 0)
+            if (shipPrefabs == null)
             {
+                Debug.LogError($"[ShipManager] Invalid Ship Data: Prefabs are null");
+                return false;
+            }
+            if (shipPrefabs.Count == 0)
+            {
+                Debug.LogError($"[ShipManager] Invalid Ship Data: Prefabs list is empty");
                 return false;
             }
             if (initialShipCount < 0)
             {
+                Debug.LogError($"[ShipManager] Invalid Ship Data: initialShipCount is less than 0: {initialShipCount}");
                 return false;
             }
 
             if (initialPirateCount < 0)
             {
+                Debug.LogError($"[ShipManager] Invalid Ship Data: initialPirateCount is less than 0: {initialPirateCount}");
                 return false;
             }
             if (spawnRadius <= 0)
             {
+                Debug.LogError($"[ShipManager] Invalid Ship Data: spawnRadius is less than or equal to 0: {spawnRadius}");
                 return false;
             }
             return true;
         }
-
     }
+
     #endregion
 }
