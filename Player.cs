@@ -2,6 +2,7 @@
     using UnityEngine;
     using System.Collections.Generic;
     using static ShipExtensions;
+    using CSM.Base;
 
     [AddComponentMenu("Game/Player")]
     public class Player : Pirate, IEntityOwner
@@ -20,26 +21,14 @@
         //Implement IEntityOwner
         public new string OwnerName => EntityName;
 
-        //Removed faction property
-       // public override FactionType Faction { get; protected set; }
-
-
         protected override void Start()
         {
-            // Don't call base.Start() as we want to handle faction differently
-            
-            // Register with ship manager after faction is set
-            if (ShipManager.Instance != null)
-            {
-                ShipManager.Instance.RegisterPlayer(this);
-                 Debug.Log($"[Player] Initialized and registered with ShipManager");
-            }
-            
             // Initialize ship list
             ownedShips ??= new List<Ship>();
 
             // Find InputManager if not assigned
             InitializeInputManager();
+            base.Start();
         }
 
         private void InitializeInputManager()

@@ -3,18 +3,13 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using CSM.Base;
-using static ShipExtensions;
-using System.Collections;
-
 using Random = UnityEngine.Random;
+using System.Collections;
 
 [AddComponentMenu("Game/Ship Manager")]
 public class ShipManager : MonoBehaviour
 {
     public static ShipManager Instance { get; private set; }
-
-    [Header("References")]
-    public GameObject piratePrefab;
 
     [Header("Ship Spawning Settings")]
     public List<InitialShipData> initialShipData;
@@ -22,13 +17,11 @@ public class ShipManager : MonoBehaviour
     public int maxSpawnAttempts = 10;
 
     private Transform shipsParent;
-    private Transform piratesParent;
     private HashSet<Vector3> occupiedPositions = new HashSet<Vector3>();
     private bool isInitialized;
     private WaterBody waterBody;
 
-    private Player playerInstance;
-    private Queue<(int count, bool isPirate)> pendingShipSpawns = new Queue<(int, bool)>();
+
 
     #region Unity Methods
     void Awake()
@@ -37,7 +30,7 @@ public class ShipManager : MonoBehaviour
         {
             Instance = this;
             DontDestroyOnLoad(gameObject);
-            StartCoroutine(InitializeManagerWhenReady());
+            StartCoroutine(InitializeManager());
         }
         else
         {
@@ -46,52 +39,9 @@ public class ShipManager : MonoBehaviour
     }
     #endregion
 
-    private IEnumerator InitializeManagerWhenReady()
+    private IEnumerator InitializeManager()
     {
-        yield return null; // Wait one frame
-
-        // Queue initial ship spawns
-        foreach (var shipData in initialShipData)
-        {
-            pendingShipSpawns.Enqueue((shipData.initialShipCount, false)); // Player Ships
-            pendingShipSpawns.Enqueue((shipData.initialPirateCount, true)); //Pirate Ships
-        }
-
-
-        StartCoroutine(ProcessPendingShipSpawns());
-    }
-
-
-    private IEnumerator ProcessPendingShipSpawns()
-    {
-        while (pendingShipSpawns.Count > 0)
-        {
-            var (count, isPirate) = pendingShipSpawns.Dequeue();
-
-
-            for (int i = 0; i < count; i++)
-            {
-                if (isPirate)
-                {
-                    SpawnPirateShip();
-                }
-                else
-                {
-                  
-                        SpawnShipForPlayer();
-                    
-                }
-
-               yield return null;
-            }
-        }
-        Debug.Log("[ShipManager] All initial ships spawned successfully");
-    }
-
-    #region Initialization
-    private void InitializeManager()
-    {
-        Debug.Log("[ShipManager] Initializing manager");
+        yield return null;
         CreateContainers();
         InitializeWaterBody();
         isInitialized = ValidateConfiguration();
@@ -101,33 +51,41 @@ public class ShipManager : MonoBehaviour
             Debug.LogError("[ShipManager] Invalid configuration, disabling manager.");
             enabled = false;
         }
+
+        Debug.Log("[ShipManager] Initialized successfully");
     }
 
     private void CreateContainers()
     {
         shipsParent = new GameObject("Ships Container").transform;
         shipsParent.SetParent(transform);
-        piratesParent = new GameObject("Pirates Container").transform;
-        piratesParent.SetParent(transform);
+
     }
 
      private bool ValidateConfiguration()
     {
-        if (initialShipData == null || initialShipData.Count == 0)
+        if (initialShipData == null)
         {
             Debug.LogError("[ShipManager] No initial ship data provided.");
             return false;
+        }
+        if (initialShipData.Count == 0)
+        {
+          Debug.LogError("[ShipManager] Initial ship data list is empty");
+          return false;
         }
         foreach (var data in initialShipData)
         {
             if (!data.Validate())
             {
+              Debug.LogError($"[ShipManager] Invalid Ship Data: {data}");
                 return false;
             }
         }
 
         return true;
     }
+    
     private void InitializeWaterBody()
     {
         waterBody = FindAnyObjectByType<WaterBody>();
@@ -137,69 +95,34 @@ public class ShipManager : MonoBehaviour
         }
     }
 
-    #endregion
 
-    #region Ship Spawning
-    public Ship SpawnShipForPlayer(Vector3? customPosition = null)
+
+    public Ship SpawnShip(IEntityOwner owner, GameObject prefab, Vector3? customPosition = null)
     {
-         if (!isInitialized)
-        {
-            pendingShipSpawns.Enqueue((1, false));
-            return null;
-        }
-          if (playerInstance == null)
-        {
-             Debug.Log($"[ShipManager] Waiting for player to be initialized");
-            return null;
-        }
-            Debug.Log($"[ShipManager] Spawning ship with owner {playerInstance?.GetType().Name}");
-            var shipData = GetInitialShipData();
-        if (shipData == null)
-        {
-             Debug.LogError($"[ShipManager] No ship data found!");
-                return null;
-        }
-            var prefab = shipData.shipPrefabs[Random.Range(0, shipData.shipPrefabs.Count)];
-            var position = customPosition ?? GetSafeSpawnPosition(shipData.spawnArea, shipData.spawnRadius);
-            var shipInstance = Instantiate(prefab, position, Quaternion.identity, shipsParent);
-            var ship = shipInstance.GetComponent<Ship>();
-            if (ship != null)
-            {
-                string shipName = $"Ship_{Random.Range(1000, 9999)}";
-                 ship.Initialize(shipName, playerInstance);
-                
-            }
 
-            return ship;
-    }
-
-
-    public Ship SpawnPirateShip(Vector3? customPosition = null)
-    {
-         if (!isInitialized)
+        if (!isInitialized)
         {
-             pendingShipSpawns.Enqueue((1, true));
+            Debug.LogError($"[ShipManager] Cannot spawn ship - manager is not initialized");
             return null;
         }
 
-        if (piratePrefab == null)
+        if (prefab == null)
         {
-            Debug.LogError("[ShipManager] Pirate prefab not assigned!");
+            Debug.LogError("[ShipManager] Ship prefab not assigned!");
             return null;
         }
 
-        if (!piratePrefab.GetComponent<Ship>())
+        if (!prefab.GetComponent<Ship>())
         {
-            Debug.LogError("[ShipManager] Pirate prefab must have Ship component!");
+            Debug.LogError("[ShipManager] Prefab must have Ship component!");
             return null;
         }
-
 
         var shipData = GetInitialShipData();
-         if (shipData == null)
+        if (shipData == null)
         {
-             Debug.LogError($"[ShipManager] No ship data found!");
-                return null;
+            Debug.LogError($"[ShipManager] No ship data found!");
+            return null;
         }
 
         Vector3 spawnPosition;
@@ -210,27 +133,22 @@ public class ShipManager : MonoBehaviour
         else
         {
             spawnPosition = GetSafeSpawnPosition(shipData.spawnArea, shipData.spawnRadius);
-            if (spawnPosition == Vector3.zero)
-            {
-                Debug.LogWarning($"[ShipManager] No available position found. Cannot spawn pirate ship.");
+              if (spawnPosition == Vector3.zero)
+             {
+                    Debug.LogWarning($"[ShipManager] No available position found. Cannot spawn ship.");
                 return null;
-            }
+             }
         }
-        occupiedPositions.Add(spawnPosition);
 
-        GameObject shipInstance = Instantiate(piratePrefab, spawnPosition, Quaternion.identity, piratesParent);
+        occupiedPositions.Add(spawnPosition);
+        GameObject shipInstance = Instantiate(prefab, spawnPosition, Quaternion.identity, shipsParent);
         Ship ship = shipInstance.GetComponent<Ship>();
         if (ship != null)
         {
-            string shipName = $"Pirate_{Random.Range(1000, 9999)}";
-            IEntityOwner owner = null;
-            if (owner == null)
-            {
-                Debug.LogWarning($"[ShipManager] Could not get or create Pirate owner.");
-            }
-
+            string shipName = $"Ship_{Random.Range(1000, 9999)}";
             ship.Initialize(shipName, owner);
-             Debug.Log($"[ShipManager] Pirate Ship {shipName} initialized and registered");
+
+            Debug.Log($"[ShipManager] Ship {shipName} initialized and registered for owner {owner.OwnerName}");
         }
         else
         {
@@ -240,6 +158,7 @@ public class ShipManager : MonoBehaviour
 
         return ship;
     }
+
 
     private Vector3 GetSafeSpawnPosition(Vector3 center, float radius)
     {
@@ -268,9 +187,8 @@ public class ShipManager : MonoBehaviour
             waterSurfaceHeight,
             center.z + Random.Range(-radius * 0.5f, radius * 0.5f)
         );
-
-        Debug.LogWarning($"[ShipManager] Could not find safe position after {maxSpawnAttempts} attempts. Using fallback position: {fallbackPosition}");
-        return fallbackPosition;
+         Debug.LogWarning($"[ShipManager] Could not find safe position after {maxSpawnAttempts} attempts. Using fallback position: {fallbackPosition}");
+         return fallbackPosition;
     }
 
     private bool IsSafePosition(Vector3 position)
@@ -284,72 +202,12 @@ public class ShipManager : MonoBehaviour
         }
         return true;
     }
-    #endregion
-
-    #region Existing Ship Registration
-    public void RegisterPlayer(Player player)
-    {
-        if (player == null)
-            throw new ArgumentNullException(nameof(player));
-
-        if (playerInstance != null && playerInstance != player)
-        {
-            Debug.LogWarning("Attempting to register a new player while one is already registered. Unregistering previous player.");
-            UnregisterPlayer();
-        }
-
-        playerInstance = player;
-         if(isInitialized)
-        {
-            
-            foreach (var ship in player.GetOwnedShips())
-            {
-                RegisterShip(ship);
-            }
-        }
-
-        Debug.Log($"Player registered with ShipManager");
-    }
-
-    public void UnregisterPlayer()
-    {
-        if (playerInstance != null)
-        {
-             foreach (var ship in playerInstance.GetOwnedShips())
-            {
-                if (ship != null)
-                {
-                    UnregisterShip(ship);
-                }
-            }
-
-
-            playerInstance = null;
-            Debug.Log("Player unregistered from ShipManager");
-        }
-    }
-
-
-      public void RegisterShip(Ship ship)
-    {
-        if (ship == null)
-            throw new ArgumentNullException(nameof(ship));
-        if (ship.Owner
-            == null)
-        {
-            Debug.LogError($"[ShipManager] Ship {ship.Name} has no owner during registration");
-            return;
-        }
-
-
-    }
 
     public void UnregisterShip(Ship ship)
     {
         if (ship == null)
             throw new System.ArgumentNullException(nameof(ship));
     }
-
 
     public void OnShipDestroyed(Ship ship)
     {
@@ -360,20 +218,19 @@ public class ShipManager : MonoBehaviour
             Debug.Log($"[ShipManager] Ship {ship.ShipName()} destroyed, removing from occupied positions");
         }
     }
-    #endregion
 
     #region Helper Methods
-        private InitialShipData GetInitialShipData()
+    private InitialShipData GetInitialShipData()
     {
         return initialShipData.FirstOrDefault();
     }
 
-     void OnValidate()
+    void OnValidate()
     {
         if (minSpawnDistance < 0) minSpawnDistance = 50f;
         if (maxSpawnAttempts < 1) maxSpawnAttempts = 10;
     }
-
+    public bool IsInitialized => isInitialized;
     #endregion
 
     #region Editor Classes
@@ -389,13 +246,13 @@ public class ShipManager : MonoBehaviour
 
         public bool Validate()
         {
-           if (shipPrefabs == null || shipPrefabs.Count == 0)
+            if (shipPrefabs == null || shipPrefabs.Count == 0)
             {
                 return false;
             }
-           if (initialShipCount < 0)
+            if (initialShipCount < 0)
             {
-               return false;
+                return false;
             }
 
             if (initialPirateCount < 0)
