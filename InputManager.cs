@@ -1,14 +1,16 @@
 using UnityEngine;
+using CSM.Base;
 
 public class InputManager : MonoBehaviour
 {
-    private Ship selectedShip;
-    private Camera mainCamera;
-    
+    private ISelectable selectedSelectable;
+     private Ship selectedShip => selectedSelectable as Ship; // Helper property to cast
+
     [SerializeField]
     private LayerMask shipLayerMask;
     [SerializeField]
     private LayerMask groundLayerMask; // For right-click movement target detection
+    private Camera mainCamera;
 
     private void Start()
     {
@@ -20,7 +22,7 @@ public class InputManager : MonoBehaviour
         }
 
         // Setup default layer masks if not set
-        if (shipLayerMask == 0)
+       if (shipLayerMask == 0)
         {
             shipLayerMask = LayerMask.GetMask("Ship");
             Debug.LogWarning("Ship layer mask not set. Defaulting to 'Ship' layer.");
@@ -33,18 +35,19 @@ public class InputManager : MonoBehaviour
         }
     }
 
+
     public void OnShipSelected(Ship ship)
     {
         // Deselect previous ship if any
-        if (selectedShip != null)
+        if (selectedSelectable != null)
         {
-            selectedShip.Deselect();
+            selectedSelectable.Deselect();
         }
-        
-        selectedShip = ship;
-        if (selectedShip != null)
+
+        selectedSelectable = ship;
+         if (selectedSelectable != null)
         {
-            selectedShip.Select();
+           selectedSelectable.Select();
         }
     }
 
@@ -56,20 +59,18 @@ public class InputManager : MonoBehaviour
     private void HandleMouseInput()
     {
         // Only handle right-click when we have a selected ship
-        if (selectedShip == null) return;
+       if (selectedShip == null) return;
 
         if (Input.GetMouseButtonDown(1)) // Right mouse button
         {
             Ray ray = mainCamera.ScreenPointToRay(Input.mousePosition);
-            RaycastHit hit;
-
-            if (Physics.Raycast(ray, out hit, Mathf.Infinity, groundLayerMask))
+            if (Physics.Raycast(ray, out RaycastHit hit, Mathf.Infinity, groundLayerMask))
             {
                 // Get ship movement component and set target position
-                var movement = selectedShip.GetComponent<ShipMovement>();
+                 var movement = selectedShip.GetComponent<IMoveable>(); //changed from ShipMovement to IMoveable
                 if (movement != null)
                 {
-                    movement.SetTargetPosition(hit.point);
+                   movement.SetDestination(hit.point);
                     Debug.Log($"[InputManager] Moving ship to position: {hit.point}");
                 }
             }
@@ -81,16 +82,16 @@ public class InputManager : MonoBehaviour
         return selectedShip;
     }
 
-    private void OnValidate()
+   private void OnValidate()
     {
         // Help ensure proper layer masks are set in the inspector
-        if (shipLayerMask == 0)
+       if (shipLayerMask == 0)
         {
             Debug.LogWarning("Ship layer mask not set in InputManager. Please set it in the inspector.");
-        }
+       }
         if (groundLayerMask == 0)
-        {
+       {
             Debug.LogWarning("Ground layer mask not set in InputManager. Please set it in the inspector.");
         }
-    }
+   }
 }

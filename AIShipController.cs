@@ -1,4 +1,5 @@
 using UnityEngine;
+using CSM.Base;
 
 public class AIShipController : MonoBehaviour
 {
@@ -7,17 +8,17 @@ public class AIShipController : MonoBehaviour
     public float patrolRadius = 100f;
     public float detectionRange = 50f;
 
-    private ShipMovement movement;
+    private IMoveable movement;  // Changed to IMoveable
     private Vector3 homePosition;
     private float nextDecisionTime;
 
     public void Initialize(Ship ship)
     {
         controlledShip = ship;
-        movement = GetComponent<ShipMovement>();
+        movement = GetComponent<ShipMovement>();  // Correctly gets ShipMovement which implements IMoveable
         if (movement == null)
         {
-            Debug.LogError("ShipMovement component missing!");
+            Debug.LogError("IMoveable component missing!");
             enabled = false;
             return;
         }
@@ -31,7 +32,7 @@ public class AIShipController : MonoBehaviour
         if (Time.time >= nextDecisionTime)
         {
             // Simple patrol behavior
-            if (!movement.isMoving)
+             if (!movement.IsMoving) // Changed to IsMoving property
             {
                 Patrol();
             }
@@ -43,6 +44,6 @@ public class AIShipController : MonoBehaviour
     {
         Vector2 randomCircle = Random.insideUnitCircle * patrolRadius;
         Vector3 newPosition = homePosition + new Vector3(randomCircle.x, 0, randomCircle.y);
-        movement.SetTargetPosition(newPosition);
+        movement.SetDestination(newPosition);  // Changed to SetDestination method
     }
 }
