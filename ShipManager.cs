@@ -25,7 +25,7 @@ public class ShipManager : MonoBehaviour
 
     private void Awake()
     {
-        if (Instance == null)
+       if (Instance == null)
         {
             Instance = this;
             DontDestroyOnLoad(gameObject);
@@ -66,7 +66,7 @@ public class ShipManager : MonoBehaviour
 
     private bool ValidateConfiguration()
     {
-        if (initialShipData == null || initialShipData.Count == 0)
+         if (initialShipData == null || initialShipData.Count == 0)
         {
             Debug.LogError("[ShipManager] No initial ship data provided.");
             return false;
@@ -144,9 +144,22 @@ public class ShipManager : MonoBehaviour
         if (ship != null)
         {
             string shipName = $"Ship_{Random.Range(1000, 9999)}";
-            ship.Initialize(shipName, owner);
-
-            Debug.Log($"[ShipManager] Ship {shipName} initialized and registered for owner {owner.OwnerName}");
+            try
+            {
+                ship.Initialize(shipName, owner);
+                if(owner is Pirate pirate)
+                {
+                    pirate.AddShip(ship);
+                }
+               
+                Debug.Log($"[ShipManager] Ship {shipName} initialized and registered for owner {owner.OwnerName}");
+            }
+            catch (Exception e)
+            {
+                Debug.LogError($"[ShipManager] Failed to initialize ship: {e.Message}");
+                Destroy(shipInstance);
+                return null;
+            }
         }
         else
         {
@@ -159,32 +172,31 @@ public class ShipManager : MonoBehaviour
 
     private Vector3 GetSafeSpawnPosition(Vector3 center, float radius)
     {
-        if (waterBody == null)
+       if (waterBody == null)
         {
             Debug.LogError("[ShipManager] No WaterBody found - cannot determine water level for ship placement!");
             return center;
         }
 
-        float waterSurfaceHeight = waterBody.GetWaterSurfaceHeight();
+       float waterSurfaceHeight = waterBody.GetWaterSurfaceHeight();
         for (int i = 0; i < maxSpawnAttempts; i++)
         {
             float randomX = center.x + Random.Range(-radius, radius);
             float randomZ = center.z + Random.Range(-radius, radius);
             Vector3 spawnPosition = new Vector3(randomX, waterSurfaceHeight, randomZ);
 
-            if (IsSafePosition(spawnPosition))
+             if (IsSafePosition(spawnPosition))
             {
-                Debug.Log($"[ShipManager] Found safe spawn position at {spawnPosition}, water height: {waterSurfaceHeight}");
+               Debug.Log($"[ShipManager] Found safe spawn position at {spawnPosition}, water height: {waterSurfaceHeight}");
                 return spawnPosition;
             }
         }
-
-        Vector3 fallbackPosition = new Vector3(
+         Vector3 fallbackPosition = new Vector3(
             center.x + Random.Range(-radius * 0.5f, radius * 0.5f),
-            waterSurfaceHeight,
+           waterSurfaceHeight,
             center.z + Random.Range(-radius * 0.5f, radius * 0.5f)
-        );
-        Debug.LogWarning($"[ShipManager] Could not find safe position after {maxSpawnAttempts} attempts. Using fallback position: {fallbackPosition}");
+       );
+       Debug.LogWarning($"[ShipManager] Could not find safe position after {maxSpawnAttempts} attempts. Using fallback position: {fallbackPosition}");
         return fallbackPosition;
     }
 
@@ -194,7 +206,7 @@ public class ShipManager : MonoBehaviour
         {
             if (Vector3.Distance(position, occupiedPosition) < minSpawnDistance)
             {
-                return false;
+               return false;
             }
         }
         return true;
@@ -210,6 +222,13 @@ public class ShipManager : MonoBehaviour
     {
         if (ship != null)
         {
+            if(ship.Owner != null){
+                if(ship.Owner is Pirate pirate){
+                    pirate.RemoveShip(ship);
+                }
+
+               ship.ClearOwner();
+            }
             UnregisterShip(ship);
             occupiedPositions.Remove(ship.transform.position);
             Debug.Log($"[ShipManager] Ship {ship.ShipName()} destroyed, removing from occupied positions");
@@ -244,7 +263,7 @@ public class ShipManager : MonoBehaviour
     [System.Serializable]
     public class InitialShipData
     {
-        public List<GameObject> shipPrefabs;
+       public List<GameObject> shipPrefabs;
         public Vector3 spawnArea;
         public float spawnRadius = 100f;
         public int initialShipCount = 3;
@@ -267,16 +286,16 @@ public class ShipManager : MonoBehaviour
                 Debug.LogError($"[ShipManager] Invalid Ship Data: initialShipCount is less than 0: {initialShipCount}");
                 return false;
             }
-
-            if (initialPirateCount < 0)
-            {
+            
+             if (initialPirateCount < 0)
+             {
                 Debug.LogError($"[ShipManager] Invalid Ship Data: initialPirateCount is less than 0: {initialPirateCount}");
                 return false;
-            }
-            if (spawnRadius <= 0)
-            {
+             }
+             if (spawnRadius <= 0)
+             {
                 Debug.LogError($"[ShipManager] Invalid Ship Data: spawnRadius is less than or equal to 0: {spawnRadius}");
-                return false;
+                 return false;
             }
             return true;
         }
