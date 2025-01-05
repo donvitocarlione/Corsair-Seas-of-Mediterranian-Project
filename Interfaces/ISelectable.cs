@@ -1,6 +1,13 @@
-public interface ISelectable
+// ISelectable.cs
+using UnityEngine;
+
+namespace CSM.Base
 {
-    bool Select();
-    void Deselect();
-    bool IsSelected { get; }
+    public interface ISelectable
+    {
+        bool IsSelected { get; }
+        void Select();
+        void Deselect();
+        Transform GetTransform();
+    }
 }

@@ -1,4 +1,5 @@
 using UnityEngine;
+using CSM.Base;
 
 public class SelectionManager : MonoBehaviour
 {
@@ -7,10 +8,10 @@ public class SelectionManager : MonoBehaviour
     [Header("References")]
     public GameObject selectionIndicatorPrefab;
 
-    private GameObject currentIndicator;
+    private ISelectable currentSelection;
     private bool isInitialized = false;
 
-    void Awake()
+     void Awake()
     {
         Debug.Log("[SelectionManager] Awake called");
         if (Instance == null)
@@ -26,9 +27,9 @@ public class SelectionManager : MonoBehaviour
         }
     }
 
-    private void Initialize()
+     private void Initialize()
     {
-        if (!isInitialized)
+         if (!isInitialized)
         {
             Debug.Log("[SelectionManager] Initializing...");
             if (selectionIndicatorPrefab == null)
@@ -36,9 +37,24 @@ public class SelectionManager : MonoBehaviour
                 Debug.LogError("[SelectionManager] Selection indicator prefab is not assigned!");
                 return;
             }
-
             Debug.Log("[SelectionManager] Initialization complete");
             isInitialized = true;
+        }
+    }
+
+    public void Select(ISelectable selectable)
+    {
+        if (currentSelection != null)
+        {
+            currentSelection.Deselect();
+             HideSelection();
+        }
+
+       currentSelection = selectable;
+        if (selectable != null)
+        {
+            ShowSelectionAt(selectable.GetTransform());
+            selectable.Select();
         }
     }
 
@@ -55,19 +71,17 @@ public class SelectionManager : MonoBehaviour
             Debug.LogWarning("[SelectionManager] Target is null, cannot show selection");
             return;
         }
-
-        if (currentIndicator == null)
-        {
-            Debug.Log("[SelectionManager] Creating new indicator instance");
-            currentIndicator = Instantiate(selectionIndicatorPrefab);
-        }
-
+        GameObject currentIndicator = GetCurrentIndicator();
+         if (currentIndicator == null)
+         {
+            Debug.LogError("[SelectionManager] Current indicator not found, failed to show selection");
+            return;
+         }
         currentIndicator.transform.position = target.position;
         currentIndicator.transform.SetParent(target);
         currentIndicator.SetActive(true);
         Debug.Log($"[SelectionManager] Indicator positioned at {currentIndicator.transform.position}");
-
-        Renderer targetRenderer = target.GetComponent<Renderer>();
+         Renderer targetRenderer = target.GetComponent<Renderer>();
         if (targetRenderer != null)
         {
             float targetSize = Mathf.Max(targetRenderer.bounds.size.x, targetRenderer.bounds.size.z);
@@ -88,24 +102,43 @@ public class SelectionManager : MonoBehaviour
         }
     }
 
-    public void HideSelection()
+      public void HideSelection()
     {
-        Debug.Log("[SelectionManager] Hiding selection");
-        if (currentIndicator != null)
+       GameObject currentIndicator = GetCurrentIndicator();
+         if (currentIndicator != null)
         {
+             Debug.Log("[SelectionManager] Hiding selection");
             currentIndicator.SetActive(false);
-            currentIndicator.transform.SetParent(null);
+             currentIndicator.transform.SetParent(null);
             Debug.Log("[SelectionManager] Selection hidden");
         }
         else
         {
             Debug.Log("[SelectionManager] No indicator to hide");
+       }
+   }
+     private GameObject GetCurrentIndicator()
+    {
+        // Check for existing indicator
+       foreach (Transform child in transform)
+       {
+            if (child.gameObject.GetComponent<SelectionIndicator>() != null)
+            {
+               return child.gameObject;
+            }
+       }
+        // If no indicator found, create new one
+        if (selectionIndicatorPrefab != null)
+        {
+            return Instantiate(selectionIndicatorPrefab, transform);
         }
-    }
-
+        return null;
+   }
     void OnDestroy()
     {
-        if (currentIndicator != null)
+        Debug.Log("[SelectionManager] Cleaning up on destroy");
+         GameObject currentIndicator = GetCurrentIndicator();
+          if (currentIndicator != null)
         {
             Debug.Log("[SelectionManager] Cleaning up indicator");
             Destroy(currentIndicator);

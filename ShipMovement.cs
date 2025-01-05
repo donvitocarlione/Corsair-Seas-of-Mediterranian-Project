@@ -1,4 +1,7 @@
+// ShipMovement.cs
+
 using UnityEngine;
+using CSM.Base;
 
 public enum ShipState
 {
@@ -8,7 +11,7 @@ public enum ShipState
     Stopping
 }
 
-public class ShipMovement : MonoBehaviour
+public class ShipMovement : MonoBehaviour, IMoveable
 {
     [Header("Ship Characteristics")]
     public float mass = 1000f;
@@ -26,7 +29,8 @@ public class ShipMovement : MonoBehaviour
     [Header("Movement Modifiers")]
     public float speedMultiplier = 1f;
     public float turnSpeedMultiplier = 1f;
-    public bool isMoving { get; private set; }
+     public bool IsMoving { get; private set; }
+    public float Speed {get; set;}
 
     private Rigidbody rb;
     private Vector3 targetPosition;
@@ -70,11 +74,11 @@ public class ShipMovement : MonoBehaviour
         turnSpeedMultiplier = 1f;
     }
 
-    public void SetTargetPosition(Vector3 position)
+    public void SetDestination(Vector3 position)
     {
         targetPosition = position;
         targetPosition.y = transform.position.y;
-        isMoving = true;
+         IsMoving = true;
         currentState = ShipState.Moving;
 
         Vector3 directionToTarget = (targetPosition - transform.position).normalized;
@@ -89,7 +93,7 @@ public class ShipMovement : MonoBehaviour
     public void StopMovement()
     {
         targetPosition = Vector3.zero;
-        isMoving = false;
+        IsMoving = false;
         currentVelocity = Vector3.zero;
         currentState = ShipState.Stopping;
         currentSpeed = 0f;
@@ -130,7 +134,7 @@ public class ShipMovement : MonoBehaviour
 
     private void MoveTowardsTarget()
     {
-        if (!isMoving) return;
+        if (!IsMoving) return;
         
         float distanceToTarget = Vector3.Distance(transform.position, targetPosition);
         

@@ -3,6 +3,20 @@ using UnityEngine;
 public class WaterBody : MonoBehaviour
 {
     [SerializeField] private float surfaceLevel = 0f;
+     public static WaterBody Instance { get; private set; }
+
+      private void Awake()
+    {
+         if (Instance == null)
+        {
+            Instance = this;
+        }
+         else
+        {
+           Debug.LogError("Multiple water bodies detected. Destroying the new one");
+            Destroy(gameObject);
+        }
+    }
 
     // Get the exact water surface height
     public float GetWaterSurfaceHeight()
@@ -10,8 +24,14 @@ public class WaterBody : MonoBehaviour
         return transform.position.y + surfaceLevel;
     }
     
-    public float GetYBound()
+     public float GetYBound()
     {
-        return transform.position.y + surfaceLevel;
+       return transform.position.y + surfaceLevel;
+    }
+
+    public bool IsPositionInWater(Vector3 position)
+    {
+        float waterHeight = GetWaterSurfaceHeight();
+        return position.y <= waterHeight;
     }
 }

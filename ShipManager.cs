@@ -15,6 +15,8 @@ public class ShipManager : MonoBehaviour
     public List<InitialShipData> initialShipData;
     public float minSpawnDistance = 50f;
     public int maxSpawnAttempts = 10;
+     [SerializeField] private float spawnCheckRadius = 5f;
+    [SerializeField] private LayerMask obstacleLayer;
 
     private Transform shipsParent;
     private HashSet<Vector3> occupiedPositions = new HashSet<Vector3>();
@@ -130,10 +132,10 @@ public class ShipManager : MonoBehaviour
         }
         else
         {
-            spawnPosition = GetSafeSpawnPosition(shipData.spawnArea, shipData.spawnRadius);
+           spawnPosition = GetSafeSpawnPosition(shipData.spawnArea, shipData.spawnRadius);
             if (spawnPosition == Vector3.zero)
             {
-                Debug.LogWarning("[ShipManager] No available position found. Cannot spawn ship.");
+                 Debug.LogWarning("[ShipManager] No available position found. Cannot spawn ship.");
                 return null;
             }
         }
@@ -147,7 +149,7 @@ public class ShipManager : MonoBehaviour
             try
             {
                 ship.Initialize(shipName, owner);
-                if(owner is Pirate pirate)
+                if (owner is Pirate pirate)
                 {
                     pirate.AddShip(ship);
                 }
@@ -172,25 +174,24 @@ public class ShipManager : MonoBehaviour
 
     private Vector3 GetSafeSpawnPosition(Vector3 center, float radius)
     {
-       if (waterBody == null)
+        if (waterBody == null)
         {
             Debug.LogError("[ShipManager] No WaterBody found - cannot determine water level for ship placement!");
             return center;
         }
 
-       float waterSurfaceHeight = waterBody.GetWaterSurfaceHeight();
+         float waterSurfaceHeight = waterBody.GetWaterSurfaceHeight();
+
         for (int i = 0; i < maxSpawnAttempts; i++)
         {
-            float randomX = center.x + Random.Range(-radius, radius);
+           float randomX = center.x + Random.Range(-radius, radius);
             float randomZ = center.z + Random.Range(-radius, radius);
-            Vector3 spawnPosition = new Vector3(randomX, waterSurfaceHeight, randomZ);
-
-             if (IsSafePosition(spawnPosition))
-            {
-               Debug.Log($"[ShipManager] Found safe spawn position at {spawnPosition}, water height: {waterSurfaceHeight}");
+           Vector3 spawnPosition = new Vector3(randomX, waterSurfaceHeight, randomZ);
+           if(IsSpawnPositionValid(spawnPosition)){
+                Debug.Log($"[ShipManager] Found safe spawn position at {spawnPosition}, water height: {waterSurfaceHeight}");
                 return spawnPosition;
             }
-        }
+         }
          Vector3 fallbackPosition = new Vector3(
             center.x + Random.Range(-radius * 0.5f, radius * 0.5f),
            waterSurfaceHeight,
@@ -200,37 +201,37 @@ public class ShipManager : MonoBehaviour
         return fallbackPosition;
     }
 
-    private bool IsSafePosition(Vector3 position)
+    private bool IsSpawnPositionValid(Vector3 position)
     {
-        foreach (var occupiedPosition in occupiedPositions)
-        {
-            if (Vector3.Distance(position, occupiedPosition) < minSpawnDistance)
-            {
-               return false;
-            }
-        }
+        // Check for obstacles and other ships
+       var colliders = Physics.OverlapSphere(position, spawnCheckRadius, obstacleLayer);
+        if (colliders.Length > 0) return false;
+        
+       if (!waterBody.IsPositionInWater(position)) return false;
         return true;
     }
 
-    public void UnregisterShip(Ship ship)
+     public void UnregisterShip(Ship ship)
     {
         if (ship == null)
-            throw new ArgumentNullException(nameof(ship));
-    }
+           throw new ArgumentNullException(nameof(ship));
+
+        if (OwnershipManager.Instance.UnregisterShip(ship))
+        {
+             Debug.Log($"[ShipManager] Ship {ship.ShipName()} unregistered from OwnershipManager.");
+             occupiedPositions.Remove(ship.transform.position);
+        }
+        else
+        {
+            Debug.LogWarning($"[ShipManager] Could not unregister ship {ship.ShipName()}");
+        }
+   }
 
     public void OnShipDestroyed(Ship ship)
     {
         if (ship != null)
         {
-            if(ship.Owner != null){
-                if(ship.Owner is Pirate pirate){
-                    pirate.RemoveShip(ship);
-                }
-
-               ship.ClearOwner();
-            }
             UnregisterShip(ship);
-            occupiedPositions.Remove(ship.transform.position);
             Debug.Log($"[ShipManager] Ship {ship.ShipName()} destroyed, removing from occupied positions");
         }
     }
