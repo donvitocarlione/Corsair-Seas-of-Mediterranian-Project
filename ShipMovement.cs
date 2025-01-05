@@ -1,5 +1,6 @@
+// ShipMovement.cs
 using UnityEngine;
-using CSM.Base; // Added the namespace
+using CSM.Base;
 
 public enum ShipState
 {
@@ -27,16 +28,18 @@ public class ShipMovement : MonoBehaviour, IMoveable
     [Header("Movement Modifiers")]
     public float speedMultiplier = 1f;
     public float turnSpeedMultiplier = 1f;
-    public bool IsMoving { get; private set; }  // Implement property from interface
+    public bool IsMoving { get; private set; }
     public float Speed { get; set; }
 
+    [Header("Braking Settings")]
+    public float brakeThreshold = 0.01f;
 
     private Rigidbody rb;
     private Vector3 targetPosition;
-    private Vector3 currentVelocity;
     private Quaternion targetRotation;
     private ShipState currentState = ShipState.Idle;
     private float currentSpeed = 0f;
+
 
     void Start()
     {
@@ -51,7 +54,7 @@ public class ShipMovement : MonoBehaviour, IMoveable
         InitializePhysics();
     }
 
-     private void InitializePhysics()
+    private void InitializePhysics()
     {
         rb.useGravity = true;
         rb.mass = mass;
@@ -64,7 +67,7 @@ public class ShipMovement : MonoBehaviour, IMoveable
     public void ApplyNavigationBonus(float bonus)
     {
         speedMultiplier = bonus;
-       turnSpeedMultiplier = Mathf.Lerp(1f, bonus, 0.5f);
+        turnSpeedMultiplier = Mathf.Lerp(1f, bonus, 0.5f);
     }
 
     public void ResetNavigationBonus()
@@ -76,7 +79,7 @@ public class ShipMovement : MonoBehaviour, IMoveable
     public void SetDestination(Vector3 destination)
     {
         targetPosition = destination;
-        targetPosition.y = transform.position.y; // Keep same height
+        targetPosition.y = transform.position.y;
         IsMoving = true;
         currentState = ShipState.Moving;
 
@@ -93,7 +96,6 @@ public class ShipMovement : MonoBehaviour, IMoveable
     {
         targetPosition = Vector3.zero;
         IsMoving = false;
-        currentVelocity = Vector3.zero;
         currentState = ShipState.Stopping;
         currentSpeed = 0f;
     }
@@ -103,15 +105,15 @@ public class ShipMovement : MonoBehaviour, IMoveable
         switch (currentState)
         {
             case ShipState.Moving:
-           case ShipState.Turning:
-               RotateTowardsTarget();
-               MoveTowardsTarget();
-               break;
+            case ShipState.Turning:
+                RotateTowardsTarget();
+                MoveTowardsTarget();
+                break;
 
-           case ShipState.Stopping:
-               ApplyBraking();
-               break;
-       }
+            case ShipState.Stopping:
+                ApplyBraking();
+                break;
+        }
         ApplyWaterPhysics();
         ApplyWindPhysics();
     }
@@ -124,8 +126,8 @@ public class ShipMovement : MonoBehaviour, IMoveable
         transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation,
            currentTurnSpeed * Time.fixedDeltaTime);
 
-       if (Quaternion.Angle(transform.rotation, targetRotation) < 1f)
-       {
+        if (Quaternion.Angle(transform.rotation, targetRotation) < 1f)
+        {
             currentState = ShipState.Moving;
         }
     }
@@ -142,56 +144,48 @@ public class ShipMovement : MonoBehaviour, IMoveable
             return;
         }
 
-        // Calculate desired speed based on distance
         float desiredSpeed = Mathf.Min(
            baseSpeed * speedMultiplier,
             Mathf.Sqrt(2f * acceleration * distanceToTarget)
         );
 
-        // Apply smooth acceleration/deceleration
        currentSpeed = Mathf.MoveTowards(
             currentSpeed,
             desiredSpeed,
             (desiredSpeed > currentSpeed ? acceleration : deceleration) * Time.fixedDeltaTime
        );
 
-        // Calculate movement direction
         Vector3 moveDirection = transform.forward;
         Vector3 targetVelocity = moveDirection * currentSpeed;
 
-        // Apply movement
         rb.linearVelocity = Vector3.Lerp(rb.linearVelocity, targetVelocity, Time.fixedDeltaTime);
     }
 
     private void ApplyWaterPhysics()
     {
-        // Apply water resistance based on speed
-       float resistance = waterResistance * rb.linearVelocity.magnitude * rb.linearVelocity.magnitude;
+         float resistance = waterResistance * rb.linearVelocity.magnitude * rb.linearVelocity.magnitude;
         rb.AddForce(-rb.linearVelocity.normalized * resistance);
 
-        // Apply wave effects
         float waveHeight = Mathf.Sin(Time.time * 0.5f) * 0.1f;
         rb.AddForce(Vector3.up * waveHeight, ForceMode.Acceleration);
     }
 
-   private void ApplyWindPhysics()
+    private void ApplyWindPhysics()
     {
-        // Simplified wind effect (you can integrate with a weather system later)
        Vector3 windDirection = new Vector3(Mathf.Sin(Time.time * 0.1f), 0, Mathf.Cos(Time.time * 0.1f));
         float windStrength = 0.5f + Mathf.Sin(Time.time * 0.05f) * 0.5f;
 
-        // Calculate wind effect based on ship's orientation
         float windEffect = Vector3.Dot(windDirection, transform.forward);
        rb.AddForce(windDirection * windStrength * windEffect * windResistance);
     }
 
     private void ApplyBraking()
     {
-       if (rb.linearVelocity.magnitude < 0.01f)
-       {
+        if (rb.linearVelocity.magnitude < brakeThreshold)
+        {
             rb.linearVelocity = Vector3.zero;
             currentState = ShipState.Idle;
-           return;
+            return;
         }
 
         rb.AddForce(-rb.linearVelocity * deceleration, ForceMode.Acceleration);

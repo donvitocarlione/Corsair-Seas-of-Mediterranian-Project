@@ -1,49 +1,49 @@
+// AIShipController.cs
 using UnityEngine;
 using CSM.Base;
 
 public class AIShipController : MonoBehaviour
 {
-    public Ship controlledShip;
-    public float decisionInterval = 2f;
-    public float patrolRadius = 100f;
-    public float detectionRange = 50f;
+    [SerializeField] private float decisionInterval = 2f;
+    [SerializeField] private float patrolRadius = 100f;
+    [SerializeField] private float detectionRange = 50f;
 
-    private IMoveable movement;  // Changed to IMoveable
-    private Vector3 homePosition;
-    private float nextDecisionTime;
+    private IMoveable _movement;
+    private Vector3 _homePosition;
+    private float _nextDecisionTime;
+    private Ship _controlledShip;
 
     public void Initialize(Ship ship)
     {
-        controlledShip = ship;
-        movement = GetComponent<ShipMovement>();  // Correctly gets ShipMovement which implements IMoveable
-        if (movement == null)
+        _controlledShip = ship;
+         _movement = GetComponent<ShipMovement>();
+         if (_movement == null)
         {
-            Debug.LogError("IMoveable component missing!");
+           Debug.LogError("IMoveable component missing!");
             enabled = false;
             return;
-        }
+       }
 
-        homePosition = transform.position;
-        nextDecisionTime = Time.time + Random.Range(0f, decisionInterval);
+        _homePosition = transform.position;
+       _nextDecisionTime = Time.time + Random.Range(0f, decisionInterval);
     }
 
     void Update()
     {
-        if (Time.time >= nextDecisionTime)
+        if (Time.time >= _nextDecisionTime)
         {
-            // Simple patrol behavior
-             if (!movement.IsMoving) // Changed to IsMoving property
+             if (!_movement.IsMoving)
             {
                 Patrol();
             }
-            nextDecisionTime = Time.time + decisionInterval;
+           _nextDecisionTime = Time.time + decisionInterval;
         }
     }
 
     private void Patrol()
     {
         Vector2 randomCircle = Random.insideUnitCircle * patrolRadius;
-        Vector3 newPosition = homePosition + new Vector3(randomCircle.x, 0, randomCircle.y);
-        movement.SetDestination(newPosition);  // Changed to SetDestination method
+        Vector3 newPosition = _homePosition + new Vector3(randomCircle.x, 0, randomCircle.y);
+       _movement.SetDestination(newPosition);
     }
 }

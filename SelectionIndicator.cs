@@ -1,54 +1,57 @@
+// SelectionIndicator.cs
 using UnityEngine;
 
 public class SelectionIndicator : MonoBehaviour
 {
-    public float radius = 8f;              // Size of the circle
-    public float lineWidth = 0.2f;         // Thickness of the line
-    public Color selectionColor = new Color(0f, 1f, 1f, 0.5f); // Cyan semi-transparent
-    public float rotationSpeed = 30f;      // How fast the circle rotates
-    public float heightOffset = 0.5f;      // Height above water
+    [SerializeField] private float radius = 8f;
+    [SerializeField] private float lineWidth = 0.2f;
+    [SerializeField] private Color selectionColor = new Color(0f, 1f, 1f, 0.5f);
+    [SerializeField] private float rotationSpeed = 30f;
+    [SerializeField] private float heightOffset = 0.5f;
+    [SerializeField] private int circlePointCount = 50;
     
     private LineRenderer lineRenderer;
+    private Material lineMaterial;
 
     void Start()
     {
-        // Create and configure the LineRenderer
         lineRenderer = gameObject.AddComponent<LineRenderer>();
-        InitializeLineRenderer();
-        DrawCircle();
+         InitializeLineRenderer();
+         DrawCircle();
     }
-
+     private void OnDestroy()
+    {
+        if(lineMaterial != null) Destroy(lineMaterial);
+    }
+     
     void Update()
     {
-        // Rotate the selection ring
         transform.Rotate(Vector3.up, rotationSpeed * Time.deltaTime);
     }
 
     void InitializeLineRenderer()
     {
-        // Set up the line renderer material
-        lineRenderer.material = new Material(Shader.Find("Sprites/Default"));
+        lineMaterial = new Material(Shader.Find("Sprites/Default"));
+        lineRenderer.material = lineMaterial;
         lineRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
         lineRenderer.receiveShadows = false;
 
-        // Configure line appearance
         lineRenderer.startColor = selectionColor;
         lineRenderer.endColor = selectionColor;
         lineRenderer.startWidth = lineWidth;
         lineRenderer.endWidth = lineWidth;
-        lineRenderer.positionCount = 51;  // Number of points in the circle
-        lineRenderer.useWorldSpace = false; // Use local space for easier rotation
+        lineRenderer.positionCount = circlePointCount + 1;
+        lineRenderer.useWorldSpace = false;
 
-        // Make sure the line renders on top of everything
         lineRenderer.material.renderQueue = 3000;
     }
 
     void DrawCircle()
     {
-        float deltaTheta = (2f * Mathf.PI) / 50;
+       float deltaTheta = (2f * Mathf.PI) / circlePointCount;
         float theta = 0f;
 
-        for (int i = 0; i < 51; i++)
+       for (int i = 0; i <= circlePointCount; i++)
         {
             float x = radius * Mathf.Cos(theta);
             float z = radius * Mathf.Sin(theta);

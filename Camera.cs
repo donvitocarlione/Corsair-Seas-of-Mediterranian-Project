@@ -1,41 +1,45 @@
+// Camera.cs
 using UnityEngine;
 
 public class GameCamera : MonoBehaviour
 {
     [Header("Movement Settings")]
-    public float zoomSpeed = 10f;
-    public float panSpeed = 20f;
-    public float rotationSpeed = 100f;
-    public float smoothSpeed = 10f;
+    [SerializeField] private float zoomSpeed = 10f;
+    [SerializeField] private float panSpeed = 20f;
+    [SerializeField] private float rotationSpeed = 100f;
+    [SerializeField] private float smoothSpeed = 10f;
 
     [Header("Zoom Limits")]
-    public float minZoom = 5f;
-    public float maxZoom = 30f;
+    [SerializeField] private float minZoom = 5f;
+    [SerializeField] private float maxZoom = 30f;
 
     [Header("Height Settings")]
-    public float minHeight = 10f;
-    public float maxHeight = 50f;
-    public float heightDampening = 0.5f;
+    [SerializeField] private float minHeight = 10f;
+    [SerializeField] private float maxHeight = 50f;
+    [SerializeField] private float heightDampening = 0.5f;
 
     [Header("Boundary Settings")]
-    public bool useBoundary = true;
-    public Vector2 boundaryX = new Vector2(-50f, 50f);
-    public Vector2 boundaryZ = new Vector2(-50f, 50f);
+    [SerializeField] private bool useBoundary = true;
+    [SerializeField] private Vector2 boundaryX = new Vector2(-50f, 50f);
+    [SerializeField] private Vector2 boundaryZ = new Vector2(-50f, 50f);
 
     [Header("Edge Scrolling")]
-    public bool useEdgeScrolling = true;
-    public float edgeScrollThreshold = 20f;
+    [SerializeField] private bool useEdgeScrolling = true;
+    [SerializeField] private float edgeScrollThreshold = 20f;
+    [SerializeField] private float cameraAngle = 45f;
 
     private Vector3 targetPosition;
     private float currentZoom;
     private float currentRotationAngle;
     private Vector3 lastMousePosition;
+    private float targetHeight;
 
     void Start()
     {
         currentZoom = (minZoom + maxZoom) / 2f;
         targetPosition = transform.position;
         currentRotationAngle = transform.eulerAngles.y;
+        UpdateTargetHeight();
     }
 
     void Update()
@@ -51,26 +55,26 @@ public class GameCamera : MonoBehaviour
     {
         float zoomInput = Input.GetAxis("Mouse ScrollWheel");
         currentZoom = Mathf.Clamp(currentZoom - zoomInput * zoomSpeed, minZoom, maxZoom);
-        
-        // Adjust height based on zoom level
-        float heightRatio = (currentZoom - minZoom) / (maxZoom - minZoom);
-        float targetHeight = Mathf.Lerp(minHeight, maxHeight, heightRatio);
+       UpdateTargetHeight();
+
         targetPosition.y = Mathf.Lerp(targetPosition.y, targetHeight, Time.deltaTime * heightDampening);
+    }
+     private void UpdateTargetHeight()
+    {
+        float heightRatio = (currentZoom - minZoom) / (maxZoom - minZoom);
+        targetHeight = Mathf.Lerp(minHeight, maxHeight, heightRatio);
     }
 
     void HandlePanning()
     {
-        // Keyboard panning
         Vector3 panInput = new Vector3(Input.GetAxis("Horizontal"), 0f, Input.GetAxis("Vertical"));
         
         if (panInput.magnitude > 0)
         {
-            // Transform the input direction based on camera rotation
             Vector3 adjustedInput = Quaternion.Euler(0, currentRotationAngle, 0) * panInput;
             targetPosition += adjustedInput * panSpeed * Time.deltaTime * (currentZoom / minZoom);
         }
 
-        // Middle mouse button panning
         if (Input.GetMouseButton(2))
         {
             Vector3 mouseDelta = Input.mousePosition - lastMousePosition;
@@ -87,7 +91,6 @@ public class GameCamera : MonoBehaviour
 
     void HandleRotation()
     {
-        // Right mouse button rotation
         if (Input.GetMouseButton(1))
         {
             float rotationDelta = Input.GetAxis("Mouse X") * rotationSpeed * Time.deltaTime;
@@ -97,17 +100,16 @@ public class GameCamera : MonoBehaviour
 
     void HandleEdgeScrolling()
     {
-        if (!useEdgeScrolling) return;
+       if (!useEdgeScrolling) return;
 
         Vector3 mousePos = Input.mousePosition;
         Vector3 moveDirection = Vector3.zero;
 
-        // Check screen edges
-        if (mousePos.x < edgeScrollThreshold) moveDirection.x = -1;
-        else if (mousePos.x > Screen.width - edgeScrollThreshold) moveDirection.x = 1;
+       if (mousePos.x < edgeScrollThreshold) moveDirection.x = -1;
+       else if (mousePos.x > Screen.width - edgeScrollThreshold) moveDirection.x = 1;
         
         if (mousePos.y < edgeScrollThreshold) moveDirection.z = -1;
-        else if (mousePos.y > Screen.height - edgeScrollThreshold) moveDirection.z = 1;
+       else if (mousePos.y > Screen.height - edgeScrollThreshold) moveDirection.z = 1;
 
         if (moveDirection != Vector3.zero)
         {
@@ -118,12 +120,11 @@ public class GameCamera : MonoBehaviour
 
     void UpdateCameraPosition()
     {
-        // Smooth position and rotation updates
         transform.position = Vector3.Lerp(transform.position, 
             new Vector3(targetPosition.x, targetPosition.y, targetPosition.z), 
             Time.deltaTime * smoothSpeed);
 
-        Quaternion targetRotation = Quaternion.Euler(45, currentRotationAngle, 0);
+        Quaternion targetRotation = Quaternion.Euler(cameraAngle, currentRotationAngle, 0);
         transform.rotation = Quaternion.Lerp(transform.rotation, targetRotation, Time.deltaTime * smoothSpeed);
 
         lastMousePosition = Input.mousePosition;
@@ -133,8 +134,7 @@ public class GameCamera : MonoBehaviour
     {
         if (useBoundary)
         {
-            // Draw boundary gizmos
-            Gizmos.color = Color.yellow;
+           Gizmos.color = Color.yellow;
             Vector3 center = new Vector3((boundaryX.x + boundaryX.y) / 2f, 0, (boundaryZ.x + boundaryZ.y) / 2f);
             Vector3 size = new Vector3(boundaryX.y - boundaryX.x, 1, boundaryZ.y - boundaryZ.x);
             Gizmos.DrawWireCube(center, size);

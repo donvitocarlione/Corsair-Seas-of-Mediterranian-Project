@@ -1,3 +1,4 @@
+// PirateData.cs
 using UnityEngine;
 using System.Collections.Generic;
 
@@ -7,8 +8,6 @@ public class PirateData : ScriptableObject
     public string pirateName;
     public PirateRank rank;
     public bool isPlayer;
-
-    // Add ship preferences
     public List<GameObject> preferredShipPrefabs;
     public int maxShips = 3;
     public float spawnRadius = 100f;

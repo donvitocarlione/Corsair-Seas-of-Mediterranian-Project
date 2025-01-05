@@ -1,4 +1,4 @@
-// Interfaces/IEntityOwner.cs
+// IEntityOwner.cs
 using CSM.Base;
 
 public interface IEntityOwner

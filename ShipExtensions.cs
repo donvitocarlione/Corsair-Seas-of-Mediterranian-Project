@@ -1,3 +1,4 @@
+// ShipExtensions.cs
 using UnityEngine;
 
 public static class ShipExtensions

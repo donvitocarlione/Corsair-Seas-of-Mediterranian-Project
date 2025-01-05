@@ -1,4 +1,4 @@
-// Add this enum in the same file
+// PirateRank.cs
 public enum PirateRank
 {
     Regular,

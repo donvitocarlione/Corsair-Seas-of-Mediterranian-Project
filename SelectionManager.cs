@@ -1,3 +1,4 @@
+// SelectionManager.cs
 using UnityEngine;
 using CSM.Base;
 
@@ -6,12 +7,13 @@ public class SelectionManager : MonoBehaviour
     public static SelectionManager Instance { get; private set; }
 
     [Header("References")]
-    public GameObject selectionIndicatorPrefab;
+    [SerializeField] private GameObject selectionIndicatorPrefab;
 
-    private ISelectable currentSelection;
-    private bool isInitialized = false;
+    private ISelectable _currentSelection;
+    private GameObject currentIndicator;
+    private bool _isInitialized = false;
 
-     void Awake()
+    void Awake()
     {
         Debug.Log("[SelectionManager] Awake called");
         if (Instance == null)
@@ -27,30 +29,32 @@ public class SelectionManager : MonoBehaviour
         }
     }
 
-     private void Initialize()
+    private void Initialize()
     {
-         if (!isInitialized)
+         if (!_isInitialized)
         {
             Debug.Log("[SelectionManager] Initializing...");
-            if (selectionIndicatorPrefab == null)
+           if (selectionIndicatorPrefab == null)
             {
                 Debug.LogError("[SelectionManager] Selection indicator prefab is not assigned!");
                 return;
             }
+            _isInitialized = true;
+             currentIndicator = GetCurrentIndicator();
+
             Debug.Log("[SelectionManager] Initialization complete");
-            isInitialized = true;
         }
     }
 
     public void Select(ISelectable selectable)
     {
-        if (currentSelection != null)
+        if (_currentSelection != null)
         {
-            currentSelection.Deselect();
+            _currentSelection.Deselect();
              HideSelection();
         }
 
-       currentSelection = selectable;
+       _currentSelection = selectable;
         if (selectable != null)
         {
             ShowSelectionAt(selectable.GetTransform());
@@ -61,27 +65,27 @@ public class SelectionManager : MonoBehaviour
     public void ShowSelectionAt(Transform target)
     {
         Debug.Log($"[SelectionManager] Showing selection at {(target != null ? target.name : "null")}");
-        if (!isInitialized)
+        if (!_isInitialized)
         {
             Debug.LogWarning("[SelectionManager] Not initialized, cannot show selection");
             return;
         }
-        if (target == null)
+       if (target == null)
         {
             Debug.LogWarning("[SelectionManager] Target is null, cannot show selection");
             return;
         }
-        GameObject currentIndicator = GetCurrentIndicator();
-         if (currentIndicator == null)
-         {
-            Debug.LogError("[SelectionManager] Current indicator not found, failed to show selection");
+        if (currentIndicator == null)
+        {
+             Debug.LogError("[SelectionManager] Current indicator not found, failed to show selection");
             return;
-         }
+        }
         currentIndicator.transform.position = target.position;
         currentIndicator.transform.SetParent(target);
         currentIndicator.SetActive(true);
-        Debug.Log($"[SelectionManager] Indicator positioned at {currentIndicator.transform.position}");
-         Renderer targetRenderer = target.GetComponent<Renderer>();
+         Debug.Log($"[SelectionManager] Indicator positioned at {currentIndicator.transform.position}");
+       
+       Renderer targetRenderer = target.GetComponent<Renderer>();
         if (targetRenderer != null)
         {
             float targetSize = Mathf.Max(targetRenderer.bounds.size.x, targetRenderer.bounds.size.z);
@@ -96,52 +100,44 @@ public class SelectionManager : MonoBehaviour
                 Debug.LogWarning("[SelectionManager] Selection indicator component not found on prefab");
             }
         }
-        else
+       else
         {
             Debug.LogWarning($"[SelectionManager] No renderer found on target {target.name}");
         }
     }
 
-      public void HideSelection()
+     public void HideSelection()
     {
-       GameObject currentIndicator = GetCurrentIndicator();
          if (currentIndicator != null)
         {
-             Debug.Log("[SelectionManager] Hiding selection");
-            currentIndicator.SetActive(false);
-             currentIndicator.transform.SetParent(null);
-            Debug.Log("[SelectionManager] Selection hidden");
-        }
+           Debug.Log("[SelectionManager] Hiding selection");
+           currentIndicator.SetActive(false);
+          currentIndicator.transform.SetParent(null);
+           Debug.Log("[SelectionManager] Selection hidden");
+       }
         else
         {
-            Debug.Log("[SelectionManager] No indicator to hide");
-       }
-   }
-     private GameObject GetCurrentIndicator()
+           Debug.Log("[SelectionManager] No indicator to hide");
+        }
+    }
+    private GameObject GetCurrentIndicator()
     {
-        // Check for existing indicator
-       foreach (Transform child in transform)
-       {
-            if (child.gameObject.GetComponent<SelectionIndicator>() != null)
-            {
-               return child.gameObject;
-            }
-       }
-        // If no indicator found, create new one
+        if (currentIndicator != null) return currentIndicator;
+       
         if (selectionIndicatorPrefab != null)
         {
-            return Instantiate(selectionIndicatorPrefab, transform);
+            currentIndicator = Instantiate(selectionIndicatorPrefab, transform);
+            return currentIndicator;
         }
         return null;
-   }
+    }
     void OnDestroy()
     {
-        Debug.Log("[SelectionManager] Cleaning up on destroy");
-         GameObject currentIndicator = GetCurrentIndicator();
-          if (currentIndicator != null)
+         Debug.Log("[SelectionManager] Cleaning up on destroy");
+         if (currentIndicator != null)
         {
-            Debug.Log("[SelectionManager] Cleaning up indicator");
-            Destroy(currentIndicator);
+           Debug.Log("[SelectionManager] Cleaning up indicator");
+           Destroy(currentIndicator);
         }
     }
 }

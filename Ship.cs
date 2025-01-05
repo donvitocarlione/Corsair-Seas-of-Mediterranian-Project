@@ -1,3 +1,4 @@
+// Ship.cs
 using UnityEngine;
 using System.Collections;
 using UnityEngine.Events;
@@ -10,61 +11,56 @@ using CSM.Base;
 [RequireComponent(typeof(ShipMovement))]
 public class Ship : SeaEntityBase, ISelectable, IOwnable
 {
-     [Header("Ship Properties")]
+    [Header("Ship Properties")]
     [SerializeField] protected float sinkingThreshold = 20f;
     [SerializeField] protected GameObject waterSplashPrefab;
     [SerializeField] protected float waterFloodRate = 0.1f;
-    
-     private bool _isSelected;
+
+    private bool _isSelected;
     protected bool isSinking;
     private SelectionIndicator selectionIndicator;
 
     protected Rigidbody shipRigidbody;
     protected Buoyancy buoyancyComponent;
     private IMoveable movement;
+    private WaitForEndOfFrame _waitForEndOfFrame;
 
     public event UnityAction OnShipDestroyed;
-
     public bool IsSelected => _isSelected;
     public bool IsSinking => isSinking;
-
-    // Use IEntityOwner instead of IShipOwner
-    private IEntityOwner _owner;
-
-    // Use 'new' keyword to acknowledge hiding and to use own implementation:
     public new IEntityOwner Owner => _owner;
 
-    // removed event
+    private IEntityOwner _owner;
     public new event System.Action<IEntityOwner> OnOwnerChanged;
     private bool isInitialized = false;
     private bool startCalled = false;
 
-
     protected override void Awake()
     {
         base.Awake();
+        _waitForEndOfFrame = new WaitForEndOfFrame();
          Debug.Log($"[Ship] Awake called on {gameObject.name}");
         shipRigidbody = GetComponent<Rigidbody>();
         buoyancyComponent = GetComponent<Buoyancy>();
          movement = GetComponent<ShipMovement>();
         if (movement == null)
         {
-           Debug.LogError($"[Ship] No IMoveable component found on {gameObject.name}");
+            Debug.LogError($"[Ship] No IMoveable component found on {gameObject.name}");
         }
 
         var collider = GetComponent<Collider>();
         if (collider == null)
         {
-           Debug.LogError($"[Ship] No Collider found on {gameObject.name}");
-       }
+            Debug.LogError($"[Ship] No Collider found on {gameObject.name}");
+        }
 
         selectionIndicator = GetComponentInChildren<SelectionIndicator>();
         if (selectionIndicator == null)
-       {
-           Debug.LogError($"[Ship] No SelectionIndicator found on {gameObject.name}");
-       }
-       else
-       {
+        {
+            Debug.LogError($"[Ship] No SelectionIndicator found on {gameObject.name}");
+        }
+        else
+        {
             selectionIndicator.gameObject.SetActive(false);
         }
 
@@ -76,28 +72,29 @@ public class Ship : SeaEntityBase, ISelectable, IOwnable
 
         Debug.Log($"[Ship] Components check for {gameObject.name}:\n" +
                  $"- Rigidbody: {shipRigidbody != null}\n" +
-                  $"- Buoyancy: {buoyancyComponent != null}\n" +
+                 $"- Buoyancy: {buoyancyComponent != null}\n" +
                   $"- Movement: {movement != null}\n" +
-                 $"- Collider: {collider != null}\n" +
+                $"- Collider: {collider != null}\n" +
                 $"- SelectionHandler: {selectionHandler != null}\n" +
-                 $"- SelectionIndicator: {selectionIndicator != null}");
+                $"- SelectionIndicator: {selectionIndicator != null}");
     }
-
+    
    protected override void Start()
-    {
+   {
        startCalled = true;
         if (isInitialized)
         {
            OnInitializedStart();
-       }
-       Debug.Log($"[Ship] Start called on {gameObject.name}");
+        }
+        Debug.Log($"[Ship] Start called on {gameObject.name}");
         base.Start();
    }
+
     public override bool SetName(string newName)
     {
         EntityName = newName;
         Debug.Log($"[Ship] Name set to {newName} for {gameObject.name}");
-       return true;
+        return true;
     }
 
     public override void Initialize(string shipName, IEntityOwner shipOwner)
@@ -105,8 +102,8 @@ public class Ship : SeaEntityBase, ISelectable, IOwnable
         base.Initialize(shipName, null);
         if (isInitialized)
         {
-            Debug.LogWarning($"[Ship] Ship {shipName} is already initialized");
-           return;
+           Debug.LogWarning($"[Ship] Ship {shipName} is already initialized");
+            return;
         }
         if (shipOwner == null)
         {
@@ -115,83 +112,74 @@ public class Ship : SeaEntityBase, ISelectable, IOwnable
         }
         SetName(shipName);
         if (!SetOwner(shipOwner))
-        {
+       {
             Debug.LogError($"[Ship] Failed to set owner for {shipName}");
             return;
         }
-
         isInitialized = true;
         Debug.Log($"[Ship] {shipName} initialized successfully with owner {shipOwner.GetType().Name}");
         if (startCalled)
         {
-            OnInitializedStart();
-        }
-        GameEvents.ShipSpawned(this);
+           OnInitializedStart();
+       }
+       GameEvents.ShipSpawned(this);
     }
 
    protected virtual void OnInitializedStart()
     {
-        // Put your Start logic here
         Debug.Log($"[Ship] Start called for {Name} after initialization");
     }
 
-
-    // Implement IOwnable
     public override bool SetOwner(IEntityOwner newOwner)
     {
-        if (newOwner == _owner) return true; // Already set
-
-       // Handle old owner cleanup
+        if (newOwner == _owner) return true;
         var oldOwner = _owner;
         _owner = newOwner;
 
-       // Handle new owner setup
-
         Debug.Log($"[Ship] {Name} owner changed to {(_owner != null ? _owner.GetType().Name : "none")}");
-       // Use new event:
         OnOwnerChanged?.Invoke(_owner);
-       return true;
-   }
+        return true;
+    }
 
     public override void ClearOwner()
     {
         Debug.Log($"[Ship] Clearing owner for {gameObject.name}");
         _owner = null;
-   }
+    }
 
     public virtual void Select()
     {
         if (_isSelected) return;
-       _isSelected = true;
+        _isSelected = true;
         if (selectionIndicator != null) selectionIndicator.gameObject.SetActive(true);
-       Debug.Log($"[Ship] Selecting {gameObject.name}");
+        Debug.Log($"[Ship] Selecting {gameObject.name}");
    }
 
-    public virtual void Deselect()
-    {
-       if (!_isSelected) return;
-       _isSelected = false;
-       if (selectionIndicator != null) selectionIndicator.gameObject.SetActive(false);
-        Debug.Log($"[Ship] Deselecting {gameObject.name}");
-    }
-
-   public Transform GetTransform()
+   public virtual void Deselect()
    {
-       return transform;
+        if (!_isSelected) return;
+        _isSelected = false;
+        if (selectionIndicator != null) selectionIndicator.gameObject.SetActive(false);
+       Debug.Log($"[Ship] Deselecting {gameObject.name}");
     }
 
-    public virtual void TakeDamage(float damage)
+    public Transform GetTransform()
+    {
+        return transform;
+    }
+
+   public virtual void TakeDamage(float damage)
     {
        if (isSinking) return;
 
-        base.TakeDamage(damage, null); // Use base class take damage method
-        if (CurrentHealth <= sinkingThreshold && !isSinking) // Use the CurrentHealth property
+        base.TakeDamage(damage, null);
+        if (CurrentHealth <= sinkingThreshold && !isSinking)
         {
-           StartSinking();
-       }
+            StartSinking();
+        }
     }
 
-   protected virtual void StartSinking()
+    protected virtual void StartSinking()
     {
         isSinking = true;
         StartCoroutine(SinkingRoutine());
@@ -199,22 +187,20 @@ public class Ship : SeaEntityBase, ISelectable, IOwnable
 
    protected virtual IEnumerator SinkingRoutine()
     {
-        WaitForEndOfFrame waitForEndOfFrame = new WaitForEndOfFrame();
-
-       while (CurrentHealth > 0) // Changed to property
-       {
+       while (CurrentHealth > 0)
+        {
             Heal( -Time.deltaTime);
 
-           if (waterSplashPrefab != null &&
-                UnityEngine.Random.value < waterFloodRate * Time.deltaTime &&
+             if (waterSplashPrefab != null &&
+                Random.value < waterFloodRate * Time.deltaTime &&
                  buoyancyComponent != null)
-           {
-                Vector3 splashPosition = transform.position + UnityEngine.Random.insideUnitSphere * 2f;
+            {
+                Vector3 splashPosition = transform.position + Random.insideUnitSphere * 2f;
                 splashPosition.y = buoyancyComponent.WaterLevel;
-                Instantiate(waterSplashPrefab, splashPosition, Quaternion.identity);
+               Instantiate(waterSplashPrefab, splashPosition, Quaternion.identity);
             }
 
-            yield return waitForEndOfFrame;
+             yield return _waitForEndOfFrame;
         }
 
         HandleShipDestroyed();
@@ -227,36 +213,40 @@ public class Ship : SeaEntityBase, ISelectable, IOwnable
         foreach (var renderer in GetComponentsInChildren<Renderer>())
        {
             renderer.enabled = false;
-        }
+       }
 
         if (_isSelected) Deselect();
         ClearOwner();
         OnShipDestroyed?.Invoke();
 
-       GameEvents.ShipDestroyed(this);
+        if(Owner != null && Owner is Pirate pirate)
+        {
+           pirate.RemoveShip(this);
+        }
+        GameEvents.ShipDestroyed(this);
 
-        Debug.Log($"Ship {Name} has been destroyed!");
+       Debug.Log($"Ship {Name} has been destroyed!");
        ShipManager.Instance?.OnShipDestroyed(this);
     }
 
    protected override void OnDestroy()
     {
         base.OnDestroy();
-       OnShipDestroyed = null;
+        OnShipDestroyed = null;
     }
 
-    protected virtual void OnValidate()
+     protected virtual void OnValidate()
     {
-       if (sinkingThreshold > maxHealth)
+        if (sinkingThreshold > maxHealth)
         {
            sinkingThreshold = maxHealth * 0.2f;
             Debug.LogWarning($"Adjusted sinking threshold to {sinkingThreshold}");
-       }
+        }
 
        if (maxHealth <= 0)
         {
-            maxHealth = 100f;
-           Debug.LogWarning("Adjusted max health to default value (100)");
+           maxHealth = 100f;
+            Debug.LogWarning("Adjusted max health to default value (100)");
         }
     }
 }

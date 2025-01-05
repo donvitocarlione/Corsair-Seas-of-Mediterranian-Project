@@ -1,3 +1,4 @@
+// SeaEntityBase.cs
 using UnityEngine;
 using System;
 
@@ -7,58 +8,57 @@ namespace CSM.Base
     {
         #region Fields and Properties
 
-        [SerializeField] protected string entityName;
-        [SerializeField] protected float maxHealth = 100f;
+       [SerializeField] protected string _entityName;
+       [SerializeField] protected float _maxHealth = 100f;
 
         private float _currentHealth;
         private bool _isInitialized;
         private IEntityOwner _owner;
 
-        public bool IsAlive => CurrentHealth > 0;
+        public bool IsAlive => _currentHealth > 0;
         public virtual string EntityName
         {
-            get => entityName;
-            protected set => entityName = value;
+            get => _entityName;
+            protected set => _entityName = value;
         }
-
-        public float MaxHealth => maxHealth;
+        public float MaxHealth => _maxHealth;
         public float CurrentHealth => _currentHealth;
 
-        public virtual string Name
+       public virtual string Name
         {
             get => EntityName;
             protected set => EntityName = value;
         }
+
         public IEntityOwner Owner
         {
             get => _owner;
-            protected set
-            {
+           protected set
+           {
                 if (_owner != value)
                 {
                     var oldOwner = _owner;
                     _owner = value;
-                     HandleOwnerChanged(oldOwner, _owner); // Call method with two parameters
-                    OnOwnerChanged?.Invoke(_owner);  // invoke with new owner
+                    HandleOwnerChanged(oldOwner, _owner);
+                    OnOwnerChanged?.Invoke(_owner);
                 }
             }
         }
 
-        // Match the interface definition
         public event Action<IEntityOwner> OnOwnerChanged;
 
         #endregion
 
          #region Unity Lifecycle Methods
 
-        protected virtual void Awake()
-        {
-            _currentHealth = maxHealth;
-        }
+       protected virtual void Awake()
+       {
+           _currentHealth = _maxHealth;
+       }
 
         protected virtual void Start()
         {
-            Initialize();
+           Initialize();
         }
 
         protected virtual void OnDestroy()
@@ -74,32 +74,31 @@ namespace CSM.Base
         {
           if (_isInitialized)
             {
-                Debug.LogWarning($"[{GetType().Name}] Attempting to initialize {entityName} multiple times");
+               Debug.LogWarning($"[{GetType().Name}] Attempting to initialize {name} multiple times");
                 return;
            }
-           EntityName = name;
+           _entityName = name;
            Owner = owner;
            Initialize();
         }
-
+        
         public virtual bool SetName(string newName)
         {
-           EntityName = newName;
-            Debug.Log($"[{GetType().Name}] Name set to {newName}");
-             return true;
+            _entityName = newName;
+           Debug.Log($"[{GetType().Name}] Name set to {newName}");
+            return true;
         }
-
 
         public virtual void TakeDamage(float damage, SeaEntityBase attacker)
         {
             if (!IsAlive) return;
 
-            _currentHealth = Mathf.Max(0, _currentHealth - damage);
+           _currentHealth = Mathf.Max(0, _currentHealth - damage);
             OnTakeDamage(damage, attacker);
 
             if (_currentHealth <= 0)
             {
-                Die(attacker);
+               Die(attacker);
             }
         }
 
@@ -107,8 +106,8 @@ namespace CSM.Base
         {
             if (!IsAlive) return;
 
-            float oldHealth = _currentHealth;
-            _currentHealth = Mathf.Min(maxHealth, _currentHealth + amount);
+           float oldHealth = _currentHealth;
+            _currentHealth = Mathf.Min(_maxHealth, _currentHealth + amount);
 
             if (_currentHealth != oldHealth)
             {
@@ -118,19 +117,18 @@ namespace CSM.Base
 
         public bool IsOwnedBy(IEntityOwner controller)
         {
-           return Owner == controller;
+            return Owner == controller;
         }
 
-        // Implement IOwnable's SetOwner method
         public virtual bool SetOwner(IEntityOwner newOwner)
         {
-           Owner = newOwner;
+            Owner = newOwner;
             return true;
-       }
+        }
 
-         public virtual void ClearOwner()
+       public virtual void ClearOwner()
        {
-          Owner = null;
+           Owner = null;
        }
         #endregion
 
@@ -139,25 +137,21 @@ namespace CSM.Base
         protected virtual void Initialize()
         {
             if (_isInitialized) return;
-
-            _currentHealth = maxHealth;
-            _isInitialized = true;
-
-             OnInitialized();
+           _currentHealth = _maxHealth;
+           _isInitialized = true;
+            OnInitialized();
         }
 
        protected virtual void Cleanup()
         {
              if (!_isInitialized) return;
-
-            _isInitialized = false;
-            OnCleanup();
+           _isInitialized = false;
+           OnCleanup();
         }
 
-       protected virtual void Die(SeaEntityBase killer)
-        {
-          if (!IsAlive) return;
-
+      protected virtual void Die(SeaEntityBase killer)
+       {
+            if (!IsAlive) return;
             _currentHealth = 0;
            OnDeath(killer);
         }
@@ -168,32 +162,32 @@ namespace CSM.Base
 
         protected virtual void HandleOwnerChanged(IEntityOwner oldOwner, IEntityOwner newOwner)
         {
-             Debug.Log($"[{GetType().Name}] {entityName} owner changed from {oldOwner?.OwnerName ?? "none"} to {newOwner?.OwnerName ?? "none"}");
-        }
-         protected virtual void OnInitialized()
-        {
-            Debug.Log($"[{GetType().Name}] {entityName} initialized");
-        }
+            Debug.Log($"[{GetType().Name}] {_entityName} owner changed from {oldOwner?.OwnerName ?? "none"} to {newOwner?.OwnerName ?? "none"}");
+       }
+        protected virtual void OnInitialized()
+       {
+           Debug.Log($"[{GetType().Name}] {_entityName} initialized");
+       }
 
         protected virtual void OnCleanup()
-        {
-            Debug.Log($"[{GetType().Name}] {entityName} cleaned up");
+       {
+            Debug.Log($"[{GetType().Name}] {_entityName} cleaned up");
         }
 
         protected virtual void OnTakeDamage(float damage, SeaEntityBase attacker)
        {
-          Debug.Log($"[{GetType().Name}] {entityName} took {damage} damage from {attacker?.EntityName ?? "unknown"}");
-       }
+           Debug.Log($"[{GetType().Name}] {_entityName} took {damage} damage from {attacker?.EntityName ?? "unknown"}");
+        }
 
         protected virtual void OnHeal(float amount)
-        {
-           Debug.Log($"[{GetType().Name}] {entityName} healed for {amount}");
+       {
+          Debug.Log($"[{GetType().Name}] {_entityName} healed for {amount}");
        }
 
-        protected virtual void OnDeath(SeaEntityBase killer)
-        {
-           Debug.Log($"[{GetType().Name}] {entityName} was killed by {killer?.EntityName ?? "unknown"}");
-       }
+       protected virtual void OnDeath(SeaEntityBase killer)
+       {
+          Debug.Log($"[{GetType().Name}] {_entityName} was killed by {killer?.EntityName ?? "unknown"}");
+        }
 
         #endregion
     }
