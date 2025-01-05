@@ -1,24 +1,27 @@
 using UnityEngine;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using CSM.Base;
-using System;
 
 public class PirateManager : MonoBehaviour
 {
     public static PirateManager Instance { get; private set; }
 
     [Header("Pirate Settings")]
-    public List<PirateData> initialPirateData;
+    [SerializeField] private List<PirateData> pirateDataList;
+    [SerializeField] private GameObject piratePrefab;
+    [SerializeField] private GameObject playerPrefab;
 
-    private Dictionary<string, Pirate> pirates = new Dictionary<string, Pirate>();
-    private bool isInitialized = false;
+
+    private List<Pirate> activePirates = new List<Pirate>();
+    private Player player;
 
     #region Unity Methods
 
     private void Awake()
     {
-       if (Instance == null)
+        if (Instance == null)
         {
             Instance = this;
             DontDestroyOnLoad(gameObject);
@@ -31,177 +34,97 @@ public class PirateManager : MonoBehaviour
 
     private void Start()
     {
-         StartCoroutine(InitializeWhenShipManagerReady());
+        StartCoroutine(InitializeWhenShipManagerReady());
     }
 
     #endregion
 
     #region Initialization
 
-    private IEnumerator InitializeWhenShipManagerReady()
+     private IEnumerator InitializeWhenShipManagerReady()
     {
         while (!ShipManager.Instance.IsInitialized)
         {
             yield return null;
         }
 
-        InitializePirateManager();
+         InitializePirateManager();
     }
+
     private void InitializePirateManager()
     {
-        if (initialPirateData == null || initialPirateData.Count == 0)
+         if (pirateDataList == null || pirateDataList.Count == 0)
         {
             Debug.LogError("[PirateManager] No initial pirate data provided.");
-            enabled = false;
-            return;
+           enabled = false;
+           return;
         }
 
-        CreatePlayerPirate();
-        CreateInitialPirates();
-        isInitialized = true;
+         SpawnPlayer();
+         SpawnPirates();
 
         Debug.Log("[PirateManager] Initialized successfully");
     }
-
     #endregion
 
-    #region Pirate Creation
-    public Pirate CreatePirate(PirateData pirateData)
+     #region Pirate Creation
+
+    private void SpawnPlayer()
     {
-         try
+       var playerData = pirateDataList.Find(p => p.isPlayer);
+        if (playerData == null)
         {
-            string uniqueName = GenerateUniquePirateName(pirateData.pirateName);
-            GameObject pirateGameObject = new GameObject($"Pirate_{uniqueName}");
-            Pirate pirateComponent = pirateGameObject.AddComponent<Pirate>();
-            pirateComponent.SetName(uniqueName);
-            pirateComponent.SetRank(pirateData.rank);
-
-            pirates.Add(pirateComponent.EntityName, pirateComponent);
-            Debug.Log($"[PirateManager] Created pirate {uniqueName} with rank {pirateData.rank}");
-            return pirateComponent;
-        }
-        catch (Exception e)
-        {
-            Debug.LogError($"[PirateManager] Failed to create pirate: {e.Message}");
-           return null;
-       }
-    }
-
-    private string GenerateUniquePirateName(string baseName)
-    {
-       string uniqueName = baseName;
-        int attempt = 1;
-
-        while (pirates.ContainsKey(uniqueName))
-        {
-            uniqueName = $"{baseName}_{attempt}";
-            attempt++;
-        }
-        return uniqueName;
-    }
-    #endregion
-
-    #region Ship Spawning
-
-    public Ship RequestShipSpawn(Pirate owner, Vector3? position = null)
-    {
-        if (owner == null)
-        {
-           Debug.LogError("[PirateManager] Cannot request ship spawn: Owner is null");
-            return null;
-        }
-
-       PirateData pirateData = GetPirateData(owner);
-
-        if (pirateData == null)
-        {
-           Debug.LogError($"[PirateManager] No pirate data found for owner {owner.OwnerName}. Cannot spawn ship");
-            return null;
-        }
-
-       if (pirateData.preferredShipPrefabs == null || pirateData.preferredShipPrefabs.Count == 0)
-        {
-           Debug.LogError($"[PirateManager] No ship prefabs defined for {owner.OwnerName}. Cannot spawn ship");
-           return null;
-        }
-
-        GameObject prefab = pirateData.preferredShipPrefabs[UnityEngine.Random.Range(0, pirateData.preferredShipPrefabs.Count)];
-       return ShipManager.Instance.SpawnShip(owner, prefab, position);
-   }
-
-    #endregion
-
-    #region Helper Methods
-
-    public Pirate GetPirate(string pirateId)
-    {
-        pirates.TryGetValue(pirateId, out Pirate pirate);
-        return pirate;
-    }
-
-    public void RemovePirate(string pirateId)
-    {
-        pirates.Remove(pirateId);
-    }
-
-    private PirateData GetPirateData(Pirate pirate)
-    {
-        return initialPirateData.Find(data => data.pirateName == pirate.EntityName);
-    }
-    private void CreatePlayerPirate()
-    {
-        PirateData playerData = initialPirateData.Find(data => data.isPlayer);
-
-       if (playerData == null)
-        {
-           Debug.LogError("[PirateManager] No player pirate data found. Cannot create player pirate.");
+           Debug.LogError("[PirateManager] No player data found!");
             return;
-       }
-
-       Pirate playerPirate = CreatePirate(playerData);
-
-        if (playerPirate != null)
-        {
-           for (int i = 0; i < playerData.maxShips; i++)
-            {
-                 RequestShipSpawn(playerPirate, playerData.spawnArea);
-            }
-
-            Debug.Log($"[PirateManager] Player Pirate {playerPirate.EntityName} created successfully.");
         }
-        else
-        {
-            Debug.LogError("[PirateManager] Failed to create player pirate.");
-       }
+
+        var playerObj = Instantiate(playerPrefab);
+        player = playerObj.GetComponent<Player>();
+        player.Initialize(playerData);
+        activePirates.Add(player);
+
+       SpawnInitialShips(player, playerData);
     }
 
-   private void CreateInitialPirates()
+    private void SpawnPirates()
     {
-       foreach (var pirateData in initialPirateData)
-       {
-          if (pirateData.isPlayer) continue;
+       foreach (var pirateData in pirateDataList.Where(p => !p.isPlayer))
+        {
+            var pirateObj = Instantiate(piratePrefab);
+            var pirate = pirateObj.GetComponent<Pirate>();
+            pirate.Initialize(pirateData);
+           activePirates.Add(pirate);
 
-           Pirate pirate = CreatePirate(pirateData);
-           if (pirate != null)
-           {
-                for (int i = 0; i < pirateData.maxShips; i++)
-                {
-                   RequestShipSpawn(pirate, pirateData.spawnArea);
-                }
-
-                Debug.Log($"[PirateManager] Pirate {pirate.EntityName} created successfully.");
-            }
-          else
-          {
-              Debug.LogError($"[PirateManager] Failed to create pirate {pirateData.pirateName}.");
-          }
+           SpawnInitialShips(pirate, pirateData);
        }
    }
 
+    private void SpawnInitialShips(Pirate pirate, PirateData pirateData)
+    {
+        for (int i = 0; i < pirateData.maxShips; i++)
+        {
+            // Request ship spawn from ShipManager
+            var randomPrefab = pirateData.preferredShipPrefabs[UnityEngine.Random.Range(0, pirateData.preferredShipPrefabs.Count)];
+            var spawnPos = GetRandomSpawnPosition(pirateData.spawnArea, pirateData.spawnRadius);
+            ShipManager.Instance.SpawnShip(pirate, randomPrefab, spawnPos);
+        }
+    }
+
+
+    private Vector3 GetRandomSpawnPosition(Vector3 center, float radius)
+    {
+       var randomAngle = UnityEngine.Random.Range(0f, 360f);
+        var randomDistance = UnityEngine.Random.Range(0f, radius);
+        var offset = Quaternion.Euler(0, randomAngle, 0) * Vector3.forward * randomDistance;
+        return center + offset;
+    }
+
     #endregion
 
-    #region Properties
-    public bool IsInitialized => isInitialized;
-
+     #region Helper Methods
+      public List<Pirate> GetActivePirates()
+     {
+         return activePirates;
+     }
     #endregion
 }

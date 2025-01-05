@@ -24,71 +24,69 @@ public class Pirate : SeaEntityBase, IEntityOwner
     //Implement IEntityOwner
     public string OwnerName => EntityName;
     // removed Faction property
-     
+
 
     protected override void Awake()
     {
-        base.Awake();
+       base.Awake();
         ownedShips = new List<Ship>();
-    }
+   }
 
     protected override void Start()
     {
-        base.Start();
-     }
+       base.Start();
+    }
 
 
     protected override void OnDestroy()
     {
         // Clean up ships
         if (ownedShips != null)
-        {
+       {
             foreach (var ship in ownedShips.ToArray())
-            {
+           {
                 if (ship != null)
                 {
                     RemoveShip(ship);
-                }
-            }
-            ownedShips.Clear();
+               }
+           }
+           ownedShips.Clear();
         }
 
-        base.OnDestroy();
+       base.OnDestroy();
     }
 
     public void SetRank(PirateRank newRank)
     {
-        rank = newRank;
-        Debug.Log($"{pirateName}'s rank has been changed to {rank}");
+       rank = newRank;
+       Debug.Log($"{pirateName}'s rank has been changed to {rank}");
         // Notify any listeners about rank change, if needed.
     }
 
     public void ModifyReputation(float amount)
-    {
+   {
         reputation = Mathf.Clamp(reputation + amount, MIN_REPUTATION, MAX_REPUTATION);
     }
 
     public void ModifyWealth(float amount)
     {
-        wealth = Mathf.Max(0f, wealth + amount);
+       wealth = Mathf.Max(0f, wealth + amount);
     }
-    
 
-
-    public virtual void AddShip(Ship ship)
+     public virtual void AddShip(Ship ship)
     {
         if (ReferenceEquals(ship, null))
-        {
-            Debug.LogError("Attempting to add a null ship!");
-            return;
+       {
+           Debug.LogError("Attempting to add a null ship!");
+           return;
         }
 
-        if (!ownedShips.Contains(ship))
-        {
+       if (!ownedShips.Contains(ship))
+       {
             ownedShips.Add(ship);
-            // Re-initialize ship with pirate as the owner, because this ship was probably spawned before this pirate
-             ship.Initialize(ship.Name, this);
-            Debug.Log($"Added ship {ship.ShipName()} to {GetType().Name}'s fleet");
+            // Only set the owner, don't reinitialize
+           ship.SetOwner(this);
+           Debug.Log($"Added ship {ship.ShipName()} to {GetType().Name}'s fleet");
         }
     }
 
@@ -96,44 +94,60 @@ public class Pirate : SeaEntityBase, IEntityOwner
     {
         if (ship == null)
         {
-            Debug.LogError("Attempting to remove a null ship!");
+           Debug.LogError("Attempting to remove a null ship!");
             return;
-        }
+       }
 
         if (ownedShips.Contains(ship))
         {
-            ownedShips.Remove(ship);
+           ownedShips.Remove(ship);
             if (ReferenceEquals(ship.Owner, this))
-            {
-                ship.SetOwner(null);
+           {
+               ship.SetOwner(null);
             }
-             Debug.Log($"Removed ship {ship.ShipName()} from {GetType().Name}'s fleet");
+            Debug.Log($"Removed ship {ship.ShipName()} from {GetType().Name}'s fleet");
         }
-    }
+   }
 
-    public virtual void SelectShip(Ship ship)
+   public virtual void SelectShip(Ship ship)
     {
         if (ship == null)
-        {
-            Debug.LogError("Attempting to select a null ship!");
+       {
+           Debug.LogError("Attempting to select a null ship!");
             return;
         }
 
         if (ownedShips.Contains(ship))
         {
-            foreach (var ownedShip in ownedShips)
+           foreach (var ownedShip in ownedShips)
             {
-                if (ownedShip != null && ownedShip != ship && ownedShip.IsSelected)
-                {
+               if (ownedShip != null && ownedShip != ship && ownedShip.IsSelected)
+               {
                     ownedShip.Deselect();
-                }
-            }
-            ship.Select();
+               }
+           }
+           ship.Select();
         }
     }
 
-     public List<Ship> GetOwnedShips()
+    public List<Ship> GetOwnedShips()
+   {
+       return new List<Ship>(ownedShips);
+    }
+    public virtual void Initialize(PirateData data)
     {
-        return new List<Ship>(ownedShips);
+        if (isInitialized)
+        {
+           Debug.LogWarning($"Pirate {EntityName} is already initialized!");
+           return;
+        }
+
+        pirateName = data.pirateName;
+       rank = data.rank;
+       wealth = 1000f; // Starting wealth
+       reputation = 50f; // Starting reputation
+
+        isInitialized = true;
+        Debug.Log($"Initialized pirate {pirateName} with rank {rank}");
     }
 }
